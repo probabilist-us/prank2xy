@@ -1,6 +1,9 @@
 /**
- * Goal: is faster to find a single quantile, and select all entries below
- * that quantile, than to sort a list completely
+ * Experiment. Say k is in the dozens and n is about 2*k*k
+ * There is a list of n Comparable items
+ * Which is faster, 1 or 2.
+ * 1. Sort all n items and pick first k
+ * 2. Maintain a sorted list of the lowest k, as we run through the list.
  */
 package utilityTests;
 
