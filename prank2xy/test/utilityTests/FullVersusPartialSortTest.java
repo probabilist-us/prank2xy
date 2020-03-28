@@ -32,17 +32,18 @@ public class FullVersusPartialSortTest<V extends Comparator> {
 	final int n = 2 * k * k;
 	long start;
 	List<V> sample, bestK;
-	SortedSet<V> runningK;
+
 	/*
 	 * The Comparator will be based on ranking induced by base point.
 	 */
-	V basePoint; 
+	V basePoint;
 
 	public FullVersusPartialSortTest() {
 		this.sample = new ArrayList<V>();
 		this.bestK = new ArrayList<V>();
-		this.runningK = new TreeSet<V>();
+
 	}
+
 	/*
 	 * Call this method before calling either of the two following ones.
 	 */
@@ -55,9 +56,9 @@ public class FullVersusPartialSortTest<V extends Comparator> {
 	private double fullSortTiming() {
 		this.bestK.clear();
 		this.start = System.currentTimeMillis();
-		Comparator<V> cprtr = (V p, V q)->this.basePoint.compare(p, q);
-		Collections.sort(this.sample, cprtr );
-		this.bestK.addAll(this.sample.subList(0, k-1));
+		Comparator<V> cprtr = (V p, V q) -> this.basePoint.compare(p, q);
+		Collections.sort(this.sample, cprtr);
+		this.bestK.addAll(this.sample.subList(0, k - 1));
 		return (0.001 * (double) (System.currentTimeMillis() - start));
 	}
 
@@ -67,14 +68,16 @@ public class FullVersusPartialSortTest<V extends Comparator> {
 		/*
 		 * The first k elements of the sample are taken as initial running best
 		 */
-		this.runningK.addAll(this.sample.subList(0, k-1));
-		Comparator<V> cprtr = (V p, V q)->this.basePoint.compare(p, q);
+		Comparator<V> cprtr = (V p, V q) -> this.basePoint.compare(p, q);
+		SortedSet<V> runningK = new TreeSet<V>(cprtr);
+		runningK.addAll(this.sample.subList(0, k - 1));
+
 		/*
-		 * Each of the remaining n-k elements of the sample is added if it is better than 
-		 * the worst ranking element of the running best
+		 * Each of the remaining n-k elements of the sample is added if it is better
+		 * than the worst ranking element of the running best
 		 */
-		for(int i = k; i < n; i++) {
-			
+		for (int i = k; i < n; i++) {
+
 		}
 		return (0.001 * (double) (System.currentTimeMillis() - start));
 	}
