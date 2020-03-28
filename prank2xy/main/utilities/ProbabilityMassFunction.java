@@ -1,4 +1,8 @@
 /**
+ * @deprecated
+ * Good stuff moved to 
+ * FullVersusPartialSortTest
+ * 
  * This object is a finite probability mass function on {0, 1, ...d-1}
  * which gives positive mass to every atom.
  * Map each object x to a comparator which says y < z if D(x|y) < D(x|z).
@@ -49,7 +53,7 @@ public class ProbabilityMassFunction implements Comparator<List<Double>> {
 	public int compare(List<Double> y, List<Double> z) {
 		double dy = div.applyAsDouble(this.pmf, y);
 		double dz = div.applyAsDouble(this.pmf, z);
-		return (int)Math.signum(dy - dz);
+		return (int) Math.signum(dy - dz);
 	}
 
 }
