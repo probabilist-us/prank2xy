@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.SplittableRandom;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -27,6 +28,7 @@ public class kNNDescent<V> {
 	Map<V, Comparator<V>> crs; // concordant ranking system on the set of points
 	Map<V, Set<V>> friends, coFriends;
 	int k;
+	SplittableRandom g;
 	Map<V, Boolean> noChangePossible; // when we try to refresh friends, no new candidates are offered
 
 	/**
@@ -37,15 +39,22 @@ public class kNNDescent<V> {
 	public kNNDescent(List<V> dataPoints, Map<V, Comparator<V>> rankingSystem, int numberOfNeighbors) {
 		this.k = numberOfNeighbors;
 		this.points = dataPoints;
-		this.crs = rankingSystem;
-		this.noChangePossible = this.points.stream().collect(Collectors.toMap(Function.identity(),x->Boolean.FALSE));
 		Collections.shuffle(this.points); // This random order will be maintained through all refresh cycles
+		this.crs = rankingSystem;
+		this.noChangePossible = this.points.stream().collect(Collectors.toMap(Function.identity(), x -> Boolean.FALSE));
+		g = new SplittableRandom();
+
+	}
+
+	public void initializeFriends() {
+		// TODO
 	}
 
 	/*
-	 * During the execution of this function, the sets friends.get(x) and coFriends.get(x) are immutable
+	 * During the execution of this function, the sets friends.get(x) and
+	 * coFriends.get(x) are immutable
 	 */
-	Function<V, Set<V>> refreshFriends = x -> {
+	Function<V, Set<V>> refreshOne = x -> {
 		Set<V> pool = new HashSet<>();
 		for (V y : this.friends.get(x)) {
 			pool.addAll(friends.get(y)); // add in friends of friends of x
@@ -64,5 +73,24 @@ public class kNNDescent<V> {
 		}
 		return runningK;
 	};
+
+	/*
+	 * Apply the refreshOne function to all of the points, in parallel
+	 */
+	public void refreshAllInParallel() {
+		Map<V, Set<V>> friendUpdates = this.points.parallelStream()
+				.collect(Collectors.toMap(Function.identity(), x -> refreshOne.apply(x)));
+		this.friends.clear();
+		/*
+		 * Make a shallow copy of friendUpdates, and call this the new friend Map.
+		 */
+		this.friends = friendUpdates.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+	}
+
+	public void assignCoFriends() {
+		this.coFriends.clear();
+		// TODO
+	}
 
 }
