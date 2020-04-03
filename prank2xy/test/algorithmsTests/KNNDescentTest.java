@@ -22,9 +22,9 @@ import algorithms.KNNDescent;
  */
 public class KNNDescentTest {
 
-	final int d = 5;
-	final int n = 10000;
-	final int k = 16;
+	final int d = 10;
+	final int n = 1000000;
+	final int k = 32;
 	Random g;
 	List<double[]> points;
 	KNNDescent<double[]> knnd;
@@ -81,7 +81,7 @@ public class KNNDescentTest {
 		KNNDescentTest test = new KNNDescentTest();
 		System.out.println("Setting up KNN Descent test on Dirichlet samples of dimension " + test.d);
 		int maxRounds = 2 * test.knnd.getExpanderBasedRoundCount();
-		double sampleRate = 0.1;
+		double sampleRate = 0.01;
 		System.out.println("n = " + test.n + " points; " + test.k + " nearest neighbors.");
 		test.knnd.kNNDescentAlgorithm(maxRounds, sampleRate);
 

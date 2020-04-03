@@ -1,5 +1,5 @@
 /**
- * K-nearest neighbor descent.
+ * K-nearest neighbor descent. Passed test 4.3.2020.
  * References:
  * [1]Jacob D. Baron; R. W. R. Darling. K-nearest neighbor approximation via the friend-of-a-friend principle. arXiv:1908.07645,
  * [2] Dong, Wei; Moses, Charikar; Li, Kai. Efficient k-nearest neighbor graph construction for generic similarity measures. 
@@ -7,10 +7,10 @@
  */
 package algorithms;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IntSummaryStatistics;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,6 +68,7 @@ public class KNNDescent<V> {
 				"Initial friend sets chosen in " + (.001 * (double) (System.currentTimeMillis() - start)) + " secs.");
 		System.out.println("Co-friend sets range in size from " + coFriendStatistics.getMin() + " to "
 				+ coFriendStatistics.getMax() + ", mean " + coFriendStatistics.getAverage());
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		/*
 		 * Prepare iteration
 		 */
@@ -85,14 +86,15 @@ public class KNNDescent<V> {
 			 * Diagnostic reports
 			 */
 			coFriendStatistics = this.coFriendStats();
-			friendStatistics = this.friendStats();		
+			friendStatistics = this.friendStats();
 			System.out.println("Round " + rounds + " of KNN Descent took "
 					+ (.001 * (double) (System.currentTimeMillis() - start)) + " secs.");
 			System.out.println("Friend sets range in size from " + friendStatistics.getMin() + " to "
 					+ friendStatistics.getMax() + ", mean " + friendStatistics.getAverage());
 			System.out.println("Co-friend sets range in size from " + coFriendStatistics.getMin() + " to "
-					+ coFriendStatistics.getMax() + ", mean " + coFriendStatistics.getAverage());		
+					+ coFriendStatistics.getMax() + ", mean " + coFriendStatistics.getAverage());
 			System.out.println("Friend clustering coefficient = " + newClusterCoeff);
+			System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		}
 		System.out.println("KNN Descent terminated after " + rounds + " rounds.");
 	}
@@ -119,7 +121,7 @@ public class KNNDescent<V> {
 	 */
 	public void initializeAllFriendSets() {
 		this.friends = this.points.parallelStream()
-				.collect(Collectors.toMap(Function.identity(), x -> randomKFriends.apply(x)));
+				.collect(Collectors.toMap(Function.identity(), x -> randomKFriends.apply(x)));  // choice between parallel or not
 		this.coFriends = this.points.parallelStream()
 				.collect(Collectors.toMap(Function.identity(), x -> new HashSet<V>()));
 	}
@@ -144,8 +146,6 @@ public class KNNDescent<V> {
 	 * execution of this function, the sets friends.get(x) and coFriends.get(x) are
 	 * immutable. Select best k candidates from co-friends, friends of friends, and
 	 * friends of co-friends.
-	 * TODO
-	 * Error here - the size of friend sets is not staying fixed at k
 	 */
 	Function<V, Set<V>> refreshOneFriendSet = x -> {
 		Set<V> pool = new HashSet<>();
@@ -159,7 +159,11 @@ public class KNNDescent<V> {
 		SortedSet<V> runningK = new TreeSet<V>(crs.apply(x));// The comparator is the ranking from x
 		runningK.addAll(this.friends.get(x)); // Initialize with the current friend set
 		for (V p : pool) {
-			if (crs.apply(x).compare(p, runningK.last()) < 0) {
+			/*
+			 * If p is one of current k best, and if p is preferred to current k-th best,
+			 * insert p
+			 */
+			if ((crs.apply(x).compare(p, runningK.last()) < 0) && (!runningK.contains(p))) {
 				runningK.remove(runningK.last());
 				runningK.add(p);
 			}
@@ -172,12 +176,12 @@ public class KNNDescent<V> {
 	 */
 	public void refreshAllFriendSets() {
 		Map<V, Set<V>> friendUpdates = this.points.parallelStream()
-				.collect(Collectors.toMap(Function.identity(), x -> refreshOneFriendSet.apply(x)));
+				.collect(Collectors.toMap(Function.identity(), x -> refreshOneFriendSet.apply(x))); // choice between parallel or not
 		this.friends.putAll(friendUpdates); // replaces previous friend sets with new ones
 	}
 
 	/*
-	 * Sample a point x, and two co-friends y, z of x. What is the probability that
+	 * Sample a point x, and two friends y, z of x. What is the probability that
 	 * y is a friend or co-friend of z? Call this the friend clustering rate. This
 	 * function estimates the friend clustering rate as a diagnostic for progress in
 	 * kNN descent. It should be close to zero at the outset, and should increase
@@ -192,11 +196,22 @@ public class KNNDescent<V> {
 			sample.add(this.points.get(g.nextInt(points.size()))); // add randomly chosen points to the sample
 		}
 		V y, z;
+		int index0, index1;
+		List<V> tempList = new ArrayList<>(); // List better than Set for drawing random samples
 		int counter = 0;
 		for (V x : sample) {
-			Iterator<V> it = this.friends.get(x).iterator(); // loops through k values
-			y = it.next(); // a friend of x
-			z = it.next(); // another friend of x
+			tempList.clear();
+			tempList.addAll(this.friends.get(x));
+			/*
+			 * Sample index0 and index1 uniformly from unordered pairs in {0, 1, ..., k-1}
+			 */
+			index0 = g.nextInt(k);
+			index1 = g.nextInt(k - 1);
+			if (index1 >= index0) {
+				index1++; // ensures index0 and index1 are different
+			}
+			y = tempList.get(index0); // a uniformly selected random friend of x
+			z = tempList.get(index1); // a uniformly selected random friend of x, different from y
 			if (this.friends.get(y).contains(z) || this.friends.get(z).contains(y)) {
 				counter++;
 			}
