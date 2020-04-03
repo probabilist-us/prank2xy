@@ -92,7 +92,7 @@ public class FullVersusPartialSortTest<V> {
 		return (0.001 * (double) (System.currentTimeMillis() - start));
 	}
 	/*
-	 * Kullback-Liebler divergence - for the case where V is a porbability mass function
+	 * Kullback-Liebler divergence - for the case where V is a probability mass function
 	 */
 	ToDoubleBiFunction<double[], double[]> div = (p, q) -> {
 		double s = 0.0;
@@ -121,7 +121,7 @@ public class FullVersusPartialSortTest<V> {
 		/*
 		 * Choose type V to be List<Double>
 		 */
-		FullVersusPartialSortTest<double[]> test = new FullVersusPartialSortTest();
+		FullVersusPartialSortTest<double[]> test = new FullVersusPartialSortTest<>();
 		Random g = new Random();
 		long d = 100;
 		/*
