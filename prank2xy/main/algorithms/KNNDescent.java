@@ -1,5 +1,8 @@
 /**
- * K-nearest neighbor descent. Passed test 4.3.2020.
+ * Parallel stream, functional implementation of K-nearest neighbor descent. 
+ * Passed test 4.3.2020.
+ * Termination criterion uses friend clustering rate.
+ * 
  * References:
  * [1]Jacob D. Baron; R. W. R. Darling. K-nearest neighbor approximation via the friend-of-a-friend principle. arXiv:1908.07645,
  * [2] Dong, Wei; Moses, Charikar; Li, Kai. Efficient k-nearest neighbor graph construction for generic similarity measures. 
@@ -9,6 +12,7 @@ package algorithms;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.DoubleSummaryStatistics;
 import java.util.HashSet;
 import java.util.IntSummaryStatistics;
 import java.util.List;
@@ -121,7 +125,8 @@ public class KNNDescent<V> {
 	 */
 	public void initializeAllFriendSets() {
 		this.friends = this.points.parallelStream()
-				.collect(Collectors.toMap(Function.identity(), x -> randomKFriends.apply(x)));  // choice between parallel or not
+				.collect(Collectors.toMap(Function.identity(), x -> randomKFriends.apply(x))); // choice between
+																								// parallel or not
 		this.coFriends = this.points.parallelStream()
 				.collect(Collectors.toMap(Function.identity(), x -> new HashSet<V>()));
 	}
@@ -144,10 +149,10 @@ public class KNNDescent<V> {
 	/*
 	 * This is the central algorithm of k-nearest neighbor descent. During the
 	 * execution of this function, the sets friends.get(x) and coFriends.get(x) are
-	 * immutable. Select best k candidates from co-friends, friends of friends, and
-	 * friends of co-friends.
+	 * immutable. Select best k candidates from friends, co-friends, friends of
+	 * friends, and friends of co-friends.
 	 */
-	Function<V, Set<V>> refreshOneFriendSet = x -> {
+	Function<V, Set<V>> proposeNewFriendSet = x -> {
 		Set<V> pool = new HashSet<>();
 		for (V y : this.friends.get(x)) {
 			pool.addAll(friends.get(y)); // add in friends of friends of x
@@ -160,10 +165,10 @@ public class KNNDescent<V> {
 		runningK.addAll(this.friends.get(x)); // Initialize with the current friend set
 		for (V p : pool) {
 			/*
-			 * If p is one of current k best, and if p is preferred to current k-th best,
-			 * insert p
+			 * If p is NOT one of current k best, nor equal to x, and if p is preferred to
+			 * current k-th best, insert p.
 			 */
-			if ((crs.apply(x).compare(p, runningK.last()) < 0) && (!runningK.contains(p))) {
+			if ((crs.apply(x).compare(p, runningK.last()) < 0) && (!runningK.contains(p)) && (!p.equals(x))) {
 				runningK.remove(runningK.last());
 				runningK.add(p);
 			}
@@ -172,17 +177,19 @@ public class KNNDescent<V> {
 	};
 
 	/*
-	 * Apply the refreshOneFriendSet function to all of the points, in parallel.
+	 * Apply the proposeNewFriendSet function to all of the points, in parallel.
+	 * 
 	 */
 	public void refreshAllFriendSets() {
 		Map<V, Set<V>> friendUpdates = this.points.parallelStream()
-				.collect(Collectors.toMap(Function.identity(), x -> refreshOneFriendSet.apply(x))); // choice between parallel or not
+				.collect(Collectors.toMap(Function.identity(), x -> proposeNewFriendSet.apply(x))); // choice between
+																									// parallel or not
 		this.friends.putAll(friendUpdates); // replaces previous friend sets with new ones
 	}
 
 	/*
-	 * Sample a point x, and two friends y, z of x. What is the probability that
-	 * y is a friend or co-friend of z? Call this the friend clustering rate. This
+	 * Sample a point x, and two friends y, z of x. What is the probability that y
+	 * is a friend or co-friend of z? Call this the friend clustering rate. This
 	 * function estimates the friend clustering rate as a diagnostic for progress in
 	 * kNN descent. It should be close to zero at the outset, and should increase
 	 * during the algorithm. If it is less after r+1 rounds than it was after r
@@ -219,6 +226,47 @@ public class KNNDescent<V> {
 		System.out
 				.println("In sampling " + sampleSize + " pairs of friends, " + counter + " were friends or cofriends.");
 		return (double) counter / (double) sampleSize;
+	}
+
+	/*
+	 * Samole m (6 maybe) points at random, and compute their TRUE k-NN sets.
+	 * EXPENSIVE! Let s[i] denote the number of true k-NN of sample point i which
+	 * appear in the friend set of the sample point. . Report
+	 * DoubleSummaryStatistics of {s[0]/m, s[1]/m, ..., s[m-1]/m). It is hoped the
+	 * mean is close to 1.
+	 */
+	public DoubleSummaryStatistics qualityAssessment(int sampleSize) {
+		Set<V> sample = new HashSet<>();
+		while (sample.size() < sampleSize) {
+			sample.add(this.points.get(g.nextInt(points.size()))); // add randomly chosen points to the sample
+		}
+		List<Double> proportionCaptured = new ArrayList<>(); // p->t if exactly t of point p's true k-NN were found
+		for (V x : sample) {
+			SortedSet<V> runningK = new TreeSet<V>(crs.apply(x));// The comparator is the ranking from x
+			runningK.addAll(this.friends.get(x)); // has k elements
+			/*
+			 * Compute the TRUE k-NN set. As we run through the points, do NOT compare x to
+			 * itself. Only remove the worst point only if the new candidate is currently
+			 * absent from the list
+			 */
+			for (V p : this.points) {
+				if ((crs.apply(x).compare(p, runningK.last()) < 0) && (!runningK.contains(p)) && (!p.equals(x))) {
+					runningK.remove(runningK.last());
+					runningK.add(p);
+				}
+			}
+			/*
+			 * How many elements of runningK are in friends.get(x)?
+			 */
+			long numberCaptured = runningK.stream().filter(p -> this.friends.get(x).contains(p)).count();
+			if (runningK.size() == k) {
+				proportionCaptured.add((double) numberCaptured / (double) this.k);
+			} else {
+				System.out.println("Error occurred during qualityAssessment: k-NN set did not have k elements.");
+			}
+		}
+
+		return proportionCaptured.stream().mapToDouble(w -> w.doubleValue()).summaryStatistics();
 	}
 
 	/**

@@ -6,6 +6,7 @@ package algorithmsTests;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.DoubleSummaryStatistics;
 import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
@@ -23,8 +24,8 @@ import algorithms.KNNDescent;
 public class KNNDescentTest {
 
 	final int d = 10;
-	final int n = 1000000;
-	final int k = 32;
+	final int n = 2000000;
+	final int k = 16;
 	Random g;
 	List<double[]> points;
 	KNNDescent<double[]> knnd;
@@ -79,12 +80,23 @@ public class KNNDescentTest {
 	 */
 	public static void main(String[] args) {
 		KNNDescentTest test = new KNNDescentTest();
+		System.out.println("Java Runtime " + Runtime.getRuntime().version().toString());
+		System.out.println("Available processors: " + Runtime.getRuntime().availableProcessors());
+		double gB = 1074741824.0;
+		System.out.println("Maximum available memory: " + (double)Runtime.getRuntime().maxMemory()/gB + " Gb.");
 		System.out.println("Setting up KNN Descent test on Dirichlet samples of dimension " + test.d);
 		int maxRounds = 2 * test.knnd.getExpanderBasedRoundCount();
 		double sampleRate = 0.01;
 		System.out.println("n = " + test.n + " points; " + test.k + " nearest neighbors.");
 		test.knnd.kNNDescentAlgorithm(maxRounds, sampleRate);
-
+		/*
+		 * Quality of approximation
+		 */
+		int ss = 6;
+		System.out.println("Proportion of true k-NN found: sample of size " + ss);
+		DoubleSummaryStatistics quality = test.knnd.qualityAssessment(ss);
+		System.out.println(quality.toString());
+		
 	}
 
 }
