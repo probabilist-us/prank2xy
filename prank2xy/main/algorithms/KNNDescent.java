@@ -1,6 +1,7 @@
 /**
  * Parallel stream, functional implementation of K-nearest neighbor descent. 
  * Passed test 4.3.2020.
+ * Revised 4.9.20 so friend sets are always sorted.
  * Termination criterion uses friend clustering rate.
  * 
  * References:
@@ -31,7 +32,8 @@ import java.util.stream.Collectors;
 public class KNNDescent<V> {
 	List<V> points; // for random sampling, a list is preferable to a set.
 	Function<V, Comparator<V>> crs; // concordant ranking system on the set of points
-	Map<V, Set<V>> friends, coFriends; // keyset = points
+	Map<V, SortedSet<V>> friends; // keyset = points
+	Map<V, Set<V>> coFriends; // keyset = points. cof-riends need not be sorted
 	int k;
 	int expanderBasedRoundCount; // plausible number of rounds, based on k and #{points}
 	SplittableRandom g;
@@ -104,10 +106,10 @@ public class KNNDescent<V> {
 	}
 
 	/*
-	 * Supplies a random initial set of k friends to a given point.
+	 * Supplies a random initial SORTED set of k friends to a given point.
 	 */
-	Function<V, Set<V>> randomKFriends = x -> {
-		Set<V> reachOut = new HashSet<>();
+	Function<V, SortedSet<V>> randomKFriends = x -> {
+		SortedSet<V> reachOut = new TreeSet<>(crs.apply(x));
 		V y;
 		while (reachOut.size() < this.k) {
 			y = this.points.get(g.nextInt(points.size()));
@@ -152,7 +154,7 @@ public class KNNDescent<V> {
 	 * immutable. Select best k candidates from friends, co-friends, friends of
 	 * friends, and friends of co-friends.
 	 */
-	Function<V, Set<V>> proposeNewFriendSet = x -> {
+	Function<V, SortedSet<V>> proposeNewFriendSet = x -> {
 		Set<V> pool = new HashSet<>();
 		for (V y : this.friends.get(x)) {
 			pool.addAll(friends.get(y)); // add in friends of friends of x
@@ -178,10 +180,10 @@ public class KNNDescent<V> {
 
 	/*
 	 * Apply the proposeNewFriendSet function to all of the points, in parallel.
-	 * 
+	 * This is the "master stroke".
 	 */
 	public void refreshAllFriendSets() {
-		Map<V, Set<V>> friendUpdates = this.points.parallelStream()
+		Map<V, SortedSet<V>> friendUpdates = this.points.parallelStream()
 				.collect(Collectors.toMap(Function.identity(), x -> proposeNewFriendSet.apply(x))); // choice between
 																									// parallel or not
 		this.friends.putAll(friendUpdates); // replaces previous friend sets with new ones
@@ -271,8 +273,9 @@ public class KNNDescent<V> {
 
 	/**
 	 * @return the friends
+	 * This getter will be used by LocalDepthCohesion<V>
 	 */
-	public Map<V, Set<V>> getFriends() {
+	public Map<V, SortedSet<V>> getFriends() {
 		return friends;
 	}
 
