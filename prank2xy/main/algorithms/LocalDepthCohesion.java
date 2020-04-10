@@ -11,8 +11,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.SortedSet;
+import java.util.function.DoubleFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import org.jgrapht.graph.DefaultWeightedEdge;
+import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 
 /**
  * @author rwrd
@@ -25,6 +29,7 @@ public class LocalDepthCohesion<V> {
 	 */
 	final Map<V, SortedSet<V>> neighbors; // keyset = points; each value set has exactly K elements
 	Function<V, Comparator<V>> crs; // concordant ranking system on the set of points
+	SimpleDirectedWeightedGraph<V, DefaultWeightedEdge> digraph;
 	// V_{x, y} K-focus counts
 
 	/**
@@ -38,6 +43,10 @@ public class LocalDepthCohesion<V> {
 				Collectors.toMap(Function.identity(), x -> Collections.unmodifiableSortedSet(neighborSets.get(x))));
 		this.crs = rankingSystem;
 	}
+	
+	DoubleFunction<DefaultWeightedEdge> cohesion = e->{
+		return 0.0;
+	};
 	
 	
 
