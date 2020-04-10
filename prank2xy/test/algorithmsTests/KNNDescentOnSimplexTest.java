@@ -80,7 +80,7 @@ public class KNNDescentOnSimplexTest {
 		System.out.println("Setting up KNN Descent test on Dirichlet samples of dimension " + test.d);
 		int maxRounds = 2 * test.knnd.getExpanderBasedRoundCount();
 		double sampleRate = 0.1;
-		System.out.println("n = " + test.n + " points; " + test.k + " nearest neighbors.");
+		System.out.println("n = " + test.n + " points; " + test.k + " nearest friends.");
 		test.knnd.kNNDescentAlgorithm(maxRounds, sampleRate);
 		/*
 		 * Quality of approximation
