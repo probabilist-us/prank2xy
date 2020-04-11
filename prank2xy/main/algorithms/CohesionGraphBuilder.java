@@ -40,7 +40,7 @@ public class CohesionGraphBuilder<V> {
 	Function<V, Comparator<V>> crs; // concordant ranking system on the set of points
 	MutableValueGraph<V, Integer> focusGraph; // undirected edge {x,y} carries # elements |V_{x,y}|
 	MutableValueGraph<V, Double> cohesionGraph; // arc x->y carries cohesion value
-	ToIntBiFunction<V, V> kFocus;
+
 	// V_{x, y} K-focus counts
 
 	/**
@@ -57,21 +57,58 @@ public class CohesionGraphBuilder<V> {
 		this.crs = rankingSystem;
 		// Initialize
 		this.coFriends = this.transpose(neighborSets);
-		this.focusGraph = ValueGraphBuilder.undirected().expectedNodeCount(neighborSets.keySet().size()).build();
-		this.buildFocusGraph(); // contains statistics needed for cohesion graph building
-		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(neighborSets.keySet().size()).build();
 		/*
-		 * Given {x,y} return # elements |V_{x,y}|.
-		 * Compute this
-		 * i
+		 * Given {x,y} return # elements |V_{x,y}|. Assume always that y is a friend of
+		 * x. However x need not be a friend of y. Proposition 4.1 in Darling paper
 		 */
-		this.kFocus = (x, y) -> {
+		ToIntBiFunction<V, V> kFocusCounter = (x, y) -> {
+			int xRanksY = this.friends.get(x).headSet(y).size() + 1; // how x ranks y
+			int counter; // intersection count
+			// Case where x is NOT a friend of y
 			if (!this.friends.get(x).contains(y)) {
-				return Integer.valueOf(1 + this.k);
-			} else {
-				return Integer.valueOf(2 + this.friends.get(x).headSet(y).size());
+				/*
+				 * Among z for which r_x(z) < r_z(y), how many are friends of y (even though x
+				 * is not a friend of y)?
+				 */
+				counter = 0;
+				for (V z : this.friends.get(x).headSet(y)) {
+					if (this.friends.get(y).contains(z)) {
+						counter++;
+					}
+				}
+				return Integer.valueOf(xRanksY + this.k + 1 - counter);
+			} else // case where y is a friend of x
+			{
+				int yRanksX = this.friends.get(y).headSet(x).size() + 1; // how y ranks x
+				/*
+				 * Among z for which r_x(z) < r_z(y), how many also satisfy r_y(z) < r_y(x)?
+				 */
+				counter = 0;
+				for (V z : this.friends.get(x).headSet(y)) {
+					if (this.friends.get(y).headSet(x).contains(z)) {
+						counter++;
+					}
+				}
+				return Integer.valueOf(xRanksY + yRanksX - counter);
 			}
 		};
+		/*
+		 * Build UNDIRECTED focus graph, with integer weights |V_{x,y}| computed by
+		 * kFocusCounter
+		 */
+		this.focusGraph = ValueGraphBuilder.undirected().expectedNodeCount(neighborSets.keySet().size()).build();
+		for (V x : this.friends.keySet()) {
+			for (V y : this.friends.get(x)) {
+				/*
+				 * Do not compute this edge weight if already {y, x} was inserted
+				 */
+				if (!this.focusGraph.hasEdgeConnecting(y, x)) {
+					this.focusGraph.putEdgeValue(x, y, kFocusCounter.applyAsInt(x, y));
+				}
+			}
+		}
+
+		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(neighborSets.keySet().size()).build();
 	}
 
 	ToDoubleFunction<EndpointPair<V>> cohesion = e -> {
@@ -93,30 +130,6 @@ public class CohesionGraphBuilder<V> {
 		}
 		return inArcs.keySet().parallelStream()
 				.collect(Collectors.toMap(Function.identity(), y -> Collections.unmodifiableSet(inArcs.get(y))));
-	}
-
-	/*
-	 * Since graph is undirected, it suffices to traverse unordered pairs {x, y}
-	 * UNFINISHED
-	 */
-	private void buildFocusGraph() {
-		int xRanksY, yRanksX;
-		for (V x : this.friends.keySet()) {
-			xRanksY = 0; // how many friends z satisfy r_x(z) < r_x(y), excluding x
-			for (V y : this.friends.get(x)) {
-				// Case 0: x is not a friend of y
-				if(!this.friends.get(y).contains(x)) {
-					
-				}
-					
-					// how many z satisfy r_y(z) < r_y(x), excluding y
-				yRanksX = this.friends.get(y).contains(x)? this.friends.get(y).headSet(x).size() : this.k;
-				
-				
-				this.focusGraph.putEdgeValue(x, y, 0);
-				xRanksY++;
-			}
-		}
 	}
 
 }
