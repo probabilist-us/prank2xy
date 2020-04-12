@@ -7,15 +7,15 @@
  */
 package algorithms;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Function;
+import java.util.function.ToDoubleBiFunction;
 import java.util.function.ToDoubleFunction;
 import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
@@ -33,15 +33,12 @@ public class CohesionGraphBuilder<V> {
 	 * Key set of friends consist of the points The friends will be passed in
 	 * unsorted. Sorting will occur
 	 */
-	final List<V> points; // remove later
 	final Map<V, SortedSet<V>> friends; // keyset = points; each value set has exactly K elements
 	final Map<V, Set<V>> coFriends;
 	final int k;
 	Function<V, Comparator<V>> crs; // concordant ranking system on the set of points
-	MutableValueGraph<V, Integer> focusGraph; // undirected edge {x,y} carries # elements |V_{x,y}|
+	MutableValueGraph<V, Integer> focusGraph; // undirected edge {x,y} carries integer |V_{x,y}|
 	MutableValueGraph<V, Double> cohesionGraph; // arc x->y carries cohesion value
-
-	// V_{x, y} K-focus counts
 
 	/**
 	 * 
@@ -50,10 +47,10 @@ public class CohesionGraphBuilder<V> {
 		/*
 		 * The sorted set is cast as UNMODIFIABLE
 		 */
-		this.points = new ArrayList<V>(neighborSets.keySet()); // toss this
 		this.friends = neighborSets.keySet().parallelStream().collect(
 				Collectors.toMap(Function.identity(), x -> Collections.unmodifiableSortedSet(neighborSets.get(x))));
-		this.k = this.friends.get(this.points.get(0)).size();
+		Iterator<V> it = this.friends.keySet().iterator();
+		this.k = this.friends.get(it.next()).size();
 		this.crs = rankingSystem;
 		// Initialize
 		this.coFriends = this.transpose(neighborSets);
@@ -108,7 +105,20 @@ public class CohesionGraphBuilder<V> {
 			}
 		}
 
-		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(neighborSets.keySet().size()).build();
+		ToDoubleBiFunction<V, V> cohesionScore = (x, v) -> {
+			return 0.0;//TODO
+		};
+		/*
+		 * Build DIRECTED cohesion graph, with loops
+		 */
+		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(neighborSets.keySet().size())
+				.allowsSelfLoops(true).build();
+		for (V x : this.friends.keySet()) {
+			// Insert x-> loop TODO
+			for (V y : this.friends.get(x)) {
+					this.cohesionGraph.putEdgeValue(x, y, cohesionScore.applyAsDouble(x, y));
+			}
+		}
 	}
 
 	ToDoubleFunction<EndpointPair<V>> cohesion = e -> {
@@ -130,6 +140,34 @@ public class CohesionGraphBuilder<V> {
 		}
 		return inArcs.keySet().parallelStream()
 				.collect(Collectors.toMap(Function.identity(), y -> Collections.unmodifiableSet(inArcs.get(y))));
+	}
+
+	/**
+	 * @return the focusGraph
+	 */
+	public MutableValueGraph<V, Integer> getFocusGraph() {
+		return focusGraph;
+	}
+
+	/**
+	 * @return the cohesionGraph
+	 */
+	public MutableValueGraph<V, Double> getCohesionGraph() {
+		return cohesionGraph;
+	}
+
+	/**
+	 * @return the friends
+	 */
+	public Map<V, SortedSet<V>> getFriends() {
+		return friends;
+	}
+
+	/**
+	 * @return the coFriends
+	 */
+	public Map<V, Set<V>> getCoFriends() {
+		return coFriends;
 	}
 
 }

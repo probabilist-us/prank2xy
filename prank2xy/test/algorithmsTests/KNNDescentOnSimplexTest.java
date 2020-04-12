@@ -33,7 +33,7 @@ public class KNNDescentOnSimplexTest {
 	KNNDescent<pointInSimplex> knnd;
 
 	/*
-	 * * Generate samples from d-dimensional Dirichlet distributions
+	 * Generate samples from d-dimensional Dirichlet distributions
 	 */
 	Supplier<pointInSimplex> dirichletGenerator = () -> {
 		double[] vec = g.doubles(this.d).map(x -> -Math.log(x)).toArray(); // exponential random variables
