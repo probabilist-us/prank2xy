@@ -3,7 +3,7 @@
  * (1) generate samples from biased Dirichlet distributions (d types)
  * (2) Apply kNNdescent
  * (3) Check focusGraph (done 4.12.2020)
- * (4) TODO
+ * (4) TODO Check cohesionGraph
  */
 package algorithmsTests;
 

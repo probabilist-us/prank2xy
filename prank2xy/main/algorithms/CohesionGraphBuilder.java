@@ -16,17 +16,15 @@ import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Function;
 import java.util.function.ToDoubleBiFunction;
-import java.util.function.ToDoubleFunction;
 import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
-import com.google.common.graph.EndpointPair;
 import com.google.common.graph.MutableValueGraph;
 import com.google.common.graph.ValueGraphBuilder;
 
 /**
  * @author rwrd
- *
+ * @since April 2020
  */
 public class CohesionGraphBuilder<V> {
 	/*
@@ -36,6 +34,7 @@ public class CohesionGraphBuilder<V> {
 	final Map<V, SortedSet<V>> friends; // keyset = points; each value set has exactly K elements
 	final Map<V, Set<V>> coFriends;
 	final int k;
+	final double kDbl;
 	Function<V, Comparator<V>> crs; // concordant ranking system on the set of points
 	MutableValueGraph<V, Integer> focusGraph; // undirected edge {x,y} carries integer |V_{x,y}|
 	MutableValueGraph<V, Double> cohesionGraph; // arc x->y carries cohesion value
@@ -51,9 +50,11 @@ public class CohesionGraphBuilder<V> {
 				Collectors.toMap(Function.identity(), x -> Collections.unmodifiableSortedSet(neighborSets.get(x))));
 		Iterator<V> it = this.friends.keySet().iterator();
 		this.k = this.friends.get(it.next()).size();
+		this.kDbl = (double) this.k;
 		this.crs = rankingSystem;
 		// Initialize
 		this.coFriends = this.transpose(neighborSets);
+		///////////////////////FOCUS GRAPH //////////////////////////////////////////////////
 		/*
 		 * Given {x,y} return # elements |V_{x,y}|. Assume always that y is a friend of
 		 * x. However x need not be a friend of y. Proposition 4.1 in Darling paper
@@ -104,9 +105,28 @@ public class CohesionGraphBuilder<V> {
 				}
 			}
 		}
-
+		///////////////////////COHESION GRAPH //////////////////////////////////////////////////
 		ToDoubleBiFunction<V, V> cohesionScore = (x, v) -> {
-			return 0.0;//TODO
+			// loop x-> x
+			double sumInv;
+			if (x.equals(v)) {
+				sumInv = 0.0;
+				for (V y : this.friends.get(x)) {
+					sumInv += 1.0 / this.focusGraph.edgeValueOrDefault(x, y, Integer.valueOf(0));
+				}
+			} else {
+				sumInv = 0.0;
+				double summand;
+				for (V y : this.friends.get(x).tailSet(v)) {
+					summand = 1.0 / this.focusGraph.edgeValueOrDefault(x, y, Integer.valueOf(0));
+					if (v.equals(y)) {
+						sumInv += 0.5 * summand; // when y = v, only half the value is added
+					} else {
+						sumInv += summand;
+					}
+				}
+			}
+			return sumInv / this.kDbl;
 		};
 		/*
 		 * Build DIRECTED cohesion graph, with loops
@@ -114,16 +134,12 @@ public class CohesionGraphBuilder<V> {
 		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(neighborSets.keySet().size())
 				.allowsSelfLoops(true).build();
 		for (V x : this.friends.keySet()) {
-			// Insert x-> loop TODO
+			this.cohesionGraph.putEdgeValue(x, x, cohesionScore.applyAsDouble(x, x)); // self-loop
 			for (V y : this.friends.get(x)) {
-					this.cohesionGraph.putEdgeValue(x, y, cohesionScore.applyAsDouble(x, y));
+				this.cohesionGraph.putEdgeValue(x, y, cohesionScore.applyAsDouble(x, y));
 			}
 		}
 	}
-
-	ToDoubleFunction<EndpointPair<V>> cohesion = e -> {
-		return 0.0;
-	};
 
 	/*
 	 * Invert all the arrows x->y, where y is a friend of x. The co-friends of x is
