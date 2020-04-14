@@ -1,6 +1,8 @@
 /**
- * Partitioned local depth, applied to KNN approximation from KNNDescent class.
- * REfs:
+ * Partitioned local depth.
+ * GENERAL CASE: not all sets friends.get(x) need be the same size.
+ * This may be applied to KNN approximation from KNNDescent class.
+ * Refs:
  * [1] Kenneth S. Berenhaut1,*, Katherine E. Moore1, Ryan L. Melvin1,2.
  * Communities in Data: A Socially-Motivated Perspective on Cohesion and Clustering, 2020
  * [2] R. W. R. DARLING, EFFICIENT  LOW  DIMENSIONAL  EMBEDDING  OF  CONCORDANT RANKING  SYSTEMS, 2020
@@ -8,11 +10,7 @@
 package algorithms;
 
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.function.Function;
 import java.util.function.ToDoubleBiFunction;
@@ -28,33 +26,26 @@ import com.google.common.graph.ValueGraphBuilder;
  */
 public class CohesionGraphBuilder<V> {
 	/*
-	 * Key set of friends consist of the points The friends will be passed in
-	 * unsorted. Sorting will occur
+	 * Key set of friends consists of the points. The friends will be passed in
+	 * sorted order. Not all sets friends.get(x) need be the same size.
 	 */
-	final Map<V, SortedSet<V>> friends; // keyset = points; each value set has exactly K elements
-	final Map<V, Set<V>> coFriends;
-	final int k;
-	final double kDbl;
-	Function<V, Comparator<V>> crs; // concordant ranking system on the set of points
+	final Map<V, SortedSet<V>> friends; // keyset = points.
 	MutableValueGraph<V, Integer> focusGraph; // undirected edge {x,y} carries integer |V_{x,y}|
 	MutableValueGraph<V, Double> cohesionGraph; // arc x->y carries cohesion value
+	double meanCohesionValue;
 
 	/**
-	 * 
+	 * @param neighborSets (sorted)
 	 */
-	public CohesionGraphBuilder(Map<V, SortedSet<V>> neighborSets, Function<V, Comparator<V>> rankingSystem) {
+	public CohesionGraphBuilder(Map<V, SortedSet<V>> neighborSets) {
 		/*
 		 * The sorted set is cast as UNMODIFIABLE
 		 */
 		this.friends = neighborSets.keySet().parallelStream().collect(
 				Collectors.toMap(Function.identity(), x -> Collections.unmodifiableSortedSet(neighborSets.get(x))));
-		Iterator<V> it = this.friends.keySet().iterator();
-		this.k = this.friends.get(it.next()).size();
-		this.kDbl = (double) this.k;
-		this.crs = rankingSystem;
-		// Initialize
-		this.coFriends = this.transpose(neighborSets);
-		///////////////////////FOCUS GRAPH //////////////////////////////////////////////////
+
+		/////////////////////// FOCUS GRAPH
+		/////////////////////// //////////////////////////////////////////////////
 		/*
 		 * Given {x,y} return # elements |V_{x,y}|. Assume always that y is a friend of
 		 * x. However x need not be a friend of y. Proposition 4.1 in Darling paper
@@ -74,7 +65,7 @@ public class CohesionGraphBuilder<V> {
 						counter++;
 					}
 				}
-				return Integer.valueOf(xRanksY + this.k + 1 - counter);
+				return Integer.valueOf(xRanksY + this.friends.get(y).size() + 1 - counter);
 			} else // case where y is a friend of x
 			{
 				int yRanksX = this.friends.get(y).headSet(x).size() + 1; // how y ranks x
@@ -105,7 +96,8 @@ public class CohesionGraphBuilder<V> {
 				}
 			}
 		}
-		///////////////////////COHESION GRAPH //////////////////////////////////////////////////
+		/////////////////////// COHESION GRAPH
+		/////////////////////// //////////////////////////////////////////////////
 		ToDoubleBiFunction<V, V> cohesionScore = (x, v) -> {
 			// loop x-> x
 			double sumInv;
@@ -126,37 +118,43 @@ public class CohesionGraphBuilder<V> {
 					}
 				}
 			}
-			return sumInv / this.kDbl;
+			return sumInv / (double) this.friends.get(x).size();
 		};
 		/*
 		 * Build DIRECTED cohesion graph, with loops
 		 */
 		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(neighborSets.keySet().size())
 				.allowsSelfLoops(true).build();
+		double weightedTrace = 0.0;
+		double w;
 		for (V x : this.friends.keySet()) {
-			this.cohesionGraph.putEdgeValue(x, x, cohesionScore.applyAsDouble(x, x)); // self-loop
+			w = cohesionScore.applyAsDouble(x, x);
+			this.cohesionGraph.putEdgeValue(x, x, w); // self-loop
+			weightedTrace += w * (double) this.friends.get(x).size(); // D_{x,x} * K_x
 			for (V y : this.friends.get(x)) {
 				this.cohesionGraph.putEdgeValue(x, y, cohesionScore.applyAsDouble(x, y));
 			}
 		}
+		// Divide weighted trace by the sum of the sizes of the friend sets
+		double sumFriendSetSizes = (double)this.friends.values().stream().mapToInt(s->s.size()).sum();
+		this.meanCohesionValue = 0.5 * weightedTrace / sumFriendSetSizes;
 	}
 
 	/*
 	 * Invert all the arrows x->y, where y is a friend of x. The co-friends of x is
-	 * an unmodifiable set.
+	 * an unmodifiable set. NOT NEEDED.
 	 * 
 	 */
-	private Map<V, Set<V>> transpose(Map<V, SortedSet<V>> outArcs) {
-		Map<V, Set<V>> inArcs = outArcs.keySet().parallelStream()
-				.collect(Collectors.toMap(Function.identity(), x -> new HashSet<V>()));
-		for (V x : outArcs.keySet()) {
-			for (V y : outArcs.get(x)) {
-				inArcs.get(y).add(x); // since y is a friend of x, add x to co-friends of y
-			}
-		}
-		return inArcs.keySet().parallelStream()
-				.collect(Collectors.toMap(Function.identity(), y -> Collections.unmodifiableSet(inArcs.get(y))));
-	}
+	/*
+	 * private Map<V, Set<V>> transpose(Map<V, SortedSet<V>> outArcs) { Map<V,
+	 * Set<V>> inArcs = outArcs.keySet().parallelStream()
+	 * .collect(Collectors.toMap(Function.identity(), x -> new HashSet<V>())); for
+	 * (V x : outArcs.keySet()) { for (V y : outArcs.get(x)) { inArcs.get(y).add(x);
+	 * // since y is a friend of x, add x to co-friends of y } } return
+	 * inArcs.keySet().parallelStream()
+	 * .collect(Collectors.toMap(Function.identity(), y ->
+	 * Collections.unmodifiableSet(inArcs.get(y)))); }
+	 */
 
 	/**
 	 * @return the focusGraph
@@ -180,10 +178,10 @@ public class CohesionGraphBuilder<V> {
 	}
 
 	/**
-	 * @return the coFriends
+	 * @return the meanCohesionValue
 	 */
-	public Map<V, Set<V>> getCoFriends() {
-		return coFriends;
+	public double getMeanCohesionValue() {
+		return meanCohesionValue;
 	}
 
 }

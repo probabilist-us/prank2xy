@@ -84,7 +84,7 @@ public class CohesionGraphTest {
 		int d = Integer.parseInt(args[0]);
 		int n = Integer.parseInt(args[1]);
 		int k = Integer.parseInt(args[2]);
-		boolean microDiagnostics = false; // only do this for examples with < 100 vertices
+		boolean microDiagnostics = true; // only do this for examples with < 100 vertices
 		// Random g = new Random();
 		CohesionGraphTest test = new CohesionGraphTest(d, n, k);
 		Runtime rt = Runtime.getRuntime();
@@ -97,7 +97,9 @@ public class CohesionGraphTest {
 		double sampleRate = 0.5;
 		System.out.println("n = " + test.n + " points; " + test.k + " nearest friends.");
 		test.knnd.kNNDescentAlgorithm(maxRounds, sampleRate);
-		test.cohere = new CohesionGraphBuilder<pointInSimplex>(test.knnd.getFriends(), test.klcmpr);
+		System.out.println("Building focus graph and cohesion matrix.");
+		test.cohere = new CohesionGraphBuilder<pointInSimplex>(test.knnd.getFriends());
+		///////////////////////////////// INSPECT GRAPHS /////////////////////////////////////////
 		ImmutableValueGraph<pointInSimplex, Integer> focusGraph = ImmutableValueGraph
 				.copyOf(test.cohere.getFocusGraph());
 		System.out.println();
@@ -105,7 +107,14 @@ public class CohesionGraphTest {
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		System.out.println("Focus graph has " + focusGraph.nodes().size() + " vertices, and "
 				+ focusGraph.edges().size() + " edges");
-
+		
+		ImmutableValueGraph<pointInSimplex, Double> cohesionGraph = ImmutableValueGraph
+				.copyOf(test.cohere.getCohesionGraph());
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println("Cohesion graph has " + cohesionGraph.nodes().size() + " vertices, and "
+				+ cohesionGraph.edges().size() + " directed edges, including loops.");
+		System.out.println("Mean cohesion value: " + test.cohere.getMeanCohesionValue());
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		///////////////////////////////// MICRO-DIAGNOSTICS/////////////////////////////////////////
 		if (microDiagnostics) {
 			test.reportMicroDiagnostics();
