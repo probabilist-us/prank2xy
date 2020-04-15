@@ -4,6 +4,7 @@
  * (2) Apply kNNdescent
  * (3) Check focusGraph (done 4.12.2020)
  * (4) TODO Check cohesionGraph
+ * (5) TODO Check clusterGraph
  */
 package algorithmsTests;
 
@@ -19,6 +20,8 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import com.google.common.graph.EndpointPair;
+import com.google.common.graph.ImmutableGraph;
 import com.google.common.graph.ImmutableValueGraph;
 
 import algorithms.CohesionGraphBuilder;
@@ -99,7 +102,8 @@ public class CohesionGraphTest {
 		test.knnd.kNNDescentAlgorithm(maxRounds, sampleRate);
 		System.out.println("Building focus graph and cohesion matrix.");
 		test.cohere = new CohesionGraphBuilder<pointInSimplex>(test.knnd.getFriends());
-		///////////////////////////////// INSPECT GRAPHS /////////////////////////////////////////
+		///////////////////////////////// INSPECT GRAPHS
+		///////////////////////////////// /////////////////////////////////////////
 		ImmutableValueGraph<pointInSimplex, Integer> focusGraph = ImmutableValueGraph
 				.copyOf(test.cohere.getFocusGraph());
 		System.out.println();
@@ -107,9 +111,10 @@ public class CohesionGraphTest {
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		System.out.println("Focus graph has " + focusGraph.nodes().size() + " vertices, and "
 				+ focusGraph.edges().size() + " edges");
-		
+		///////////////////////////////// /////////////////////////////////////////
 		ImmutableValueGraph<pointInSimplex, Double> cohesionGraph = ImmutableValueGraph
 				.copyOf(test.cohere.getCohesionGraph());
+
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		System.out.println("Cohesion graph has " + cohesionGraph.nodes().size() + " vertices, and "
 				+ cohesionGraph.edges().size() + " directed edges, including loops.");
@@ -120,7 +125,9 @@ public class CohesionGraphTest {
 			test.reportMicroDiagnostics();
 		}
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
-		System.out.println();
+		///////////////////////////////// /////////////////////////////////////////
+		ImmutableGraph<pointInSimplex> clusterGraph = ImmutableGraph.copyOf(test.cohere.getClusterGraph());
+		System.out.println("Cluster graph has " + clusterGraph.edges().size() + " edges.");
 	}
 
 	///////////////////////////////// FOCUS GRAPH
@@ -152,6 +159,39 @@ public class CohesionGraphTest {
 			}
 			listIncidenteEges = false; // only do the list once
 		}
+		System.out.println();
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println("Cohesion graph: edge weights");
+		int counter = 0;
+		int u, v;
+		double w;
+		for (EndpointPair<pointInSimplex> pair : this.cohere.getCohesionGraph().edges()) {
+			u = pair.source().hashCode() % n2p;
+			v = pair.target().hashCode() % n2p;
+			w = this.cohere.getCohesionGraph().edgeValueOrDefault(pair, 0.0);
+			System.out.print("{" + u + ", " + v + ", " + w + "}, ");
+			counter++;
+			if (counter % 5 == 0) {
+				System.out.println();
+			}
+		}
+		System.out.println();
+
+		System.out.println();
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println("Cluster graph: edge list");
+		counter = 0;
+		for (EndpointPair<pointInSimplex> pair : this.cohere.getClusterGraph().edges()) {
+			u = pair.source().hashCode() % n2p;
+			v = pair.target().hashCode() % n2p;
+			System.out.print("{" + u + ", " + v + "}, ");
+			counter++;
+			if (counter % 10 == 0) {
+				System.out.println();
+			}
+		}
+		System.out.println();
+
 	}
 
 }

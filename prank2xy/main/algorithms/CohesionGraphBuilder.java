@@ -17,6 +17,9 @@ import java.util.function.ToDoubleBiFunction;
 import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
+import com.google.common.graph.EndpointPair;
+import com.google.common.graph.GraphBuilder;
+import com.google.common.graph.MutableGraph;
 import com.google.common.graph.MutableValueGraph;
 import com.google.common.graph.ValueGraphBuilder;
 
@@ -32,6 +35,7 @@ public class CohesionGraphBuilder<V> {
 	final Map<V, SortedSet<V>> friends; // keyset = points.
 	MutableValueGraph<V, Integer> focusGraph; // undirected edge {x,y} carries integer |V_{x,y}|
 	MutableValueGraph<V, Double> cohesionGraph; // arc x->y carries cohesion value
+	MutableGraph<V> clusterGraph; // select edges of cohesionGraph whose weight is above average
 	double meanCohesionValue;
 
 	/**
@@ -85,7 +89,7 @@ public class CohesionGraphBuilder<V> {
 		 * Build UNDIRECTED focus graph, with integer weights |V_{x,y}| computed by
 		 * kFocusCounter
 		 */
-		this.focusGraph = ValueGraphBuilder.undirected().expectedNodeCount(neighborSets.keySet().size()).build();
+		this.focusGraph = ValueGraphBuilder.undirected().expectedNodeCount(this.friends.keySet().size()).build();
 		for (V x : this.friends.keySet()) {
 			for (V y : this.friends.get(x)) {
 				/*
@@ -121,9 +125,9 @@ public class CohesionGraphBuilder<V> {
 			return sumInv / (double) this.friends.get(x).size();
 		};
 		/*
-		 * Build DIRECTED cohesion graph, with loops
+		 * Build DIRECTED weighted cohesion graph, with loops
 		 */
-		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(neighborSets.keySet().size())
+		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(this.friends.keySet().size())
 				.allowsSelfLoops(true).build();
 		double weightedTrace = 0.0;
 		double w;
@@ -136,8 +140,21 @@ public class CohesionGraphBuilder<V> {
 			}
 		}
 		// Divide weighted trace by the sum of the sizes of the friend sets
-		double sumFriendSetSizes = (double)this.friends.values().stream().mapToInt(s->s.size()).sum();
+		double sumFriendSetSizes = (double) this.friends.values().stream().mapToInt(s -> s.size()).sum();
 		this.meanCohesionValue = 0.5 * weightedTrace / sumFriendSetSizes;
+		/*
+		 * Build DIRECTED unweighted cluster graph, no loops. Select the edges of the
+		 * cohesionGraph of above average weight
+		 */
+		this.clusterGraph = GraphBuilder.directed().allowsSelfLoops(false)
+				.expectedNodeCount(this.friends.keySet().size()).build();
+		for (EndpointPair<V> e : this.cohesionGraph.edges()) {
+			// exclude loops
+			if ((!e.source().equals(e.target()))
+					&& (this.cohesionGraph.edgeValueOrDefault(e, 0.0) > this.meanCohesionValue)) {
+				this.clusterGraph.putEdge(e);
+			}
+		}
 	}
 
 	/*
@@ -182,6 +199,13 @@ public class CohesionGraphBuilder<V> {
 	 */
 	public double getMeanCohesionValue() {
 		return meanCohesionValue;
+	}
+
+	/**
+	 * @return the clusterGraph
+	 */
+	public MutableGraph<V> getClusterGraph() {
+		return clusterGraph;
 	}
 
 }
