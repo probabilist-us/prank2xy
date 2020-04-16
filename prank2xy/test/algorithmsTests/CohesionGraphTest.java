@@ -38,19 +38,31 @@ public class CohesionGraphTest {
 	List<pointInSimplex> points;
 	KNNDescent<pointInSimplex> knnd;
 	CohesionGraphBuilder<pointInSimplex> cohere;
+	final int dirichletP = 3; // will add dirichletP exponential r.v.s at a time
 	/*
-	 * Generate samples from d-dimensional Dirichlet distributions, with one
-	 * component magnified d times. This should make the points cluster into d
-	 * groups.
+	 * Generate samples from d-dimensional Dirichlet(k_1, k_2, ...k_d)
+	 * distributions. Here k_i = 3, except for one randomly chosen coordinate, where
+	 * k_j = 3 * d. Such parameters were observed in Mathematica to produce d well
+	 * separated groups of points on a (d-1)-dimensional simplex.
 	 */
 	Supplier<pointInSimplex> tiltedDirichletGenerator = () -> {
-		double[] vec = g.doubles(this.d).map(x -> -Math.log(x)).toArray(); // exponential random variables
-		int boost = g.nextInt(d); // component to be boosted
-		vec[boost] *= (double) d; // one component becomes d times bigger
-		double sum = Arrays.stream(vec).sum();
+		double[] vec = new double[d];
+		int boost = g.nextInt(d); // random component to be boosted
+		int shape;
+		double sum = 0.0;
+		for (int i = 0; i < d; i++) {
+			shape = (i == boost)? this.dirichletP*this.d : this.dirichletP;
+			vec[i] = 0.0;
+			// vec[i] will have a Gamma(shape, 1) distribution
+			for (int j = 0; j < shape; j++) {
+				vec[i] -= Math.log(g.nextDouble()); // add Exponential r.v.
+			}
+			sum += vec[i];
+		}
+		// normalize the entries in vec to sum to 1.0
 		for (int i = 0; i < this.d; i++) {
 			vec[i] = vec[i] / sum;
-		} // normalize so sum is 1
+		} 
 		return new pointInSimplex(this.d, vec);
 	};
 
@@ -134,6 +146,16 @@ public class CohesionGraphTest {
 	///////////////////////////////// MICRO-DIAGNOSTICS////////////////////////////
 	private void reportMicroDiagnostics() {
 		int n2p = n * n + 1; // base for modular arithmetic, to improve readability
+		System.out.println("List of points and their coordinates: ");
+		for(pointInSimplex x : this.points) {
+			System.out.print("{" + (x.hashCode() % n2p) + " ");
+			for(double u : x.getP()) {
+				System.out.print(", " + u);
+			}
+			System.out.print("},");
+			System.out.println();
+		}
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		System.out.println("List of all the friend sets: ");
 		System.out.println();
 		boolean listIncidenteEges = true;
