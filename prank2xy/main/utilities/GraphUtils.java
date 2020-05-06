@@ -3,6 +3,8 @@
  * 
  * https://en.wikipedia.org/wiki/Kosaraju%27s_algorithm
  * @author  WorldSEnder, 2017
+ * Richard Darling adds:
+ * StronglyConnectedComponentsTest verified it on 5.6.2020
  */
 package utilities;
 

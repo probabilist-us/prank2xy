@@ -3,8 +3,8 @@
  * (1) generate samples from biased Dirichlet distributions (d types)
  * (2) Apply kNNdescent
  * (3) Check focusGraph (done 4.12.2020)
- * (4) TODO Check cohesionGraph
- * (5) TODO Check clusterGraph
+ * (4) Check cohesionGraph - may need to drop edge directions (done 5.6.20)
+ * (5) Check clusterGraph - results on 30 points in d=6 agreed well with single linkage clustering in Wolfram. (done 5.5.20)
  */
 package algorithmsTests;
 
@@ -51,7 +51,8 @@ public class CohesionGraphTest {
 		int shape;
 		double sum = 0.0;
 		for (int i = 0; i < d; i++) {
-			shape = (i == boost)? this.dirichletP*this.d : this.dirichletP;
+			shape = (i == boost) ? this.dirichletP * (this.d - 1) : this.dirichletP; // boosted component is as heavy as
+																						// all other combined.
 			vec[i] = 0.0;
 			// vec[i] will have a Gamma(shape, 1) distribution
 			for (int j = 0; j < shape; j++) {
@@ -62,7 +63,7 @@ public class CohesionGraphTest {
 		// normalize the entries in vec to sum to 1.0
 		for (int i = 0; i < this.d; i++) {
 			vec[i] = vec[i] / sum;
-		} 
+		}
 		return new pointInSimplex(this.d, vec);
 	};
 
@@ -147,9 +148,9 @@ public class CohesionGraphTest {
 	private void reportMicroDiagnostics() {
 		int n2p = n * n + 1; // base for modular arithmetic, to improve readability
 		System.out.println("List of points and their coordinates: ");
-		for(pointInSimplex x : this.points) {
+		for (pointInSimplex x : this.points) {
 			System.out.print("{" + (x.hashCode() % n2p) + " ");
-			for(double u : x.getP()) {
+			for (double u : x.getP()) {
 				System.out.print(", " + u);
 			}
 			System.out.print("},");
@@ -183,7 +184,7 @@ public class CohesionGraphTest {
 		}
 		System.out.println();
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
-		System.out.println("Cohesion graph: edge weights");
+		System.out.println("Cohesion graph: edge weights, omitting loops");
 		int counter = 0;
 		int u, v;
 		double w;
@@ -191,7 +192,10 @@ public class CohesionGraphTest {
 			u = pair.source().hashCode() % n2p;
 			v = pair.target().hashCode() % n2p;
 			w = this.cohere.getCohesionGraph().edgeValueOrDefault(pair, 0.0);
-			System.out.print("{" + u + ", " + v + ", " + w + "}, ");
+			// Omit self-loops
+			if (u != v) {
+				System.out.print("{" + u + ", " + v + ", " + w + "}, ");
+			}
 			counter++;
 			if (counter % 5 == 0) {
 				System.out.println();
