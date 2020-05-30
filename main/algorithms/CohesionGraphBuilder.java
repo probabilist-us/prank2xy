@@ -168,20 +168,23 @@ public class CohesionGraphBuilder<V> {
 
 		/*
 		 * COHESION GRAPH (revised 5.27.20) Build DIRECTED weighted cohesion graph, with
-		 * loops
+		 * loops. Begin by computing all the cohesion scores in parallel.
 		 */
+		Map<V, Map<V, Double>> cohesionMatrix = this.friends.keySet().parallelStream()
+				.collect(Collectors.toMap(Function.identity(), x->cohesionScoreMap.apply(x)));
+		// Insert these values as eedge weights in a directed graph
 		double weightedTrace = 0.0;
 		this.start = System.currentTimeMillis();
 		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(this.friends.keySet().size())
 				.allowsSelfLoops(true).build();
-		for (V x : this.friends.keySet()) {
+		for (V x : cohesionMatrix.keySet()) {
 			for (V v : cohesionScoreMap.apply(x).keySet()) { // includes v = x as one of the keys
-				this.cohesionGraph.putEdgeValue(x, v, cohesionScoreMap.apply(x).get(v)); // arc
+				this.cohesionGraph.putEdgeValue(x, v, cohesionMatrix.get(x).get(v)); // arc
 			}
 			weightedTrace += cohesionScoreMap.apply(x).get(x);// add diagonal term to trace
 		}
 		this.duration = (double) (System.currentTimeMillis() - this.start) / 1000.0;
-		System.out.println("Cohesion graph built in " + duration + " seconds.");
+		System.out.println("With parallel cohesion scoring, cohesion graph built in " + duration + " seconds.");
 		// Divide weighted trace by (2 |S|)
 		this.empiricalMeanCohesion = 0.5 * weightedTrace / this.nV; // half average of diagonal of cohesion matrix
 		this.theoreticalMeanCohesion = this.clusterThreshold();
