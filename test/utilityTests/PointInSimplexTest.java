@@ -28,9 +28,9 @@ public class PointInSimplexTest {
 			} // normalize so sum is 1
 			return vec;
 		};
-		x = new PointInSimplex(d, dirichletGenerator.get());
-		y = new PointInSimplex(d, dirichletGenerator.get());
-		z = new PointInSimplex(d, dirichletGenerator.get());
+		x = new PointInSimplex(d, dirichletGenerator.get(), Integer.MIN_VALUE);
+		y = new PointInSimplex(d, dirichletGenerator.get(), Integer.MIN_VALUE);
+		z = new PointInSimplex(d, dirichletGenerator.get(), Integer.MIN_VALUE);
 	}
 
 	/**

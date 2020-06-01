@@ -12,14 +12,18 @@
 package algorithmTests;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Random;
 import java.util.Set;
-import java.util.NavigableSet;
 import java.util.function.Function;
+import java.util.function.IntSupplier;
 import java.util.function.Supplier;
+import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,7 +40,7 @@ import utilities.PointInSimplex;
  *
  */
 public class CohesionGraphTest {
-	int d, n, k;
+	int d, n, k, numSampledPairs;
 	Random g;
 	List<PointInSimplex> points;
 	KNNDescent<PointInSimplex> knnd;
@@ -46,11 +50,14 @@ public class CohesionGraphTest {
 	 * Generate samples from d-dimensional Dirichlet(k_1, k_2, ...k_d)
 	 * distributions. Here k_i = 3, except for one randomly chosen coordinate, where
 	 * k_j = 3 * d. Such parameters were observed in Mathematica to produce d well
-	 * separated groups of points on a (d-1)-dimensional simplex.
+	 * separated groups of points on a (d-1)-dimensional simplex. The "booster"
+	 * supplies one of 0, 1, 2, ..., d-1, namely floor of an exponential r.v. with
+	 * mean d/2, truncated to d.
 	 */
+	IntSupplier booster = () -> Math.min(d - 1, (int) Math.floor(-((double) d / 2.0) * Math.log(g.nextDouble())));
 	Supplier<PointInSimplex> tiltedDirichletGenerator = () -> {
 		double[] vec = new double[d];
-		int boost = g.nextInt(d); // random component to be boosted
+		int boost = booster.getAsInt(); // random component to be boosted
 		int shape;
 		double sum = 0.0;
 		for (int i = 0; i < d; i++) {
@@ -67,7 +74,7 @@ public class CohesionGraphTest {
 		for (int i = 0; i < this.d; i++) {
 			vec[i] = vec[i] / sum;
 		}
-		return new PointInSimplex(this.d, vec);
+		return new PointInSimplex(this.d, vec, boost);
 	};
 
 	/*
@@ -80,6 +87,7 @@ public class CohesionGraphTest {
 		this.d = dimension;
 		this.n = numPoints;
 		this.k = numNeighbors;
+		this.numSampledPairs = Math.min(10000, (this.n * (this.n - 1)) / 2); // for testing cluster quality
 		g = new Random();
 		/*
 		 * Generate the set of points, and the framework for K-nearest neighbor descent
@@ -104,6 +112,12 @@ public class CohesionGraphTest {
 		int n = Integer.parseInt(args[1]);
 		int k = Integer.parseInt(args[2]);
 		boolean microDiagnostics = false; // only do this for examples with < 100 vertices
+		/*
+		 * Sample many pairs {x, y} of points. When x and y are in same true cluster,
+		 * are they in same reported cluster?
+		 */
+		boolean clusterQualityReport = true;
+		boolean writePointsToCSV = true; // for external use of alternative clustering, such as DBSCAN
 		// Random g = new Random();
 		CohesionGraphTest test = new CohesionGraphTest(d, n, k);
 		Runtime rt = Runtime.getRuntime();
@@ -175,10 +189,16 @@ public class CohesionGraphTest {
 		for (Map.Entry<Integer, Long> e : sortedComponentSizes) {
 			System.out.println("Size: " + e.getKey() + ": count = " + e.getValue());
 		}
+		if (clusterQualityReport) {
+			test.reportClusterQuality();
+		}
 	}
 
 	///////////////////////////////// FOCUS GRAPH
 	///////////////////////////////// MICRO-DIAGNOSTICS////////////////////////////
+	/*
+	 * Method of the class CohesionGraphTest
+	 */
 	private void reportMicroDiagnostics() {
 		int n2p = n * n + 1; // base for modular arithmetic, to improve readability
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
@@ -265,4 +285,48 @@ public class CohesionGraphTest {
 
 	}
 
+	/////////////////////////// DIAGNOSE CLUSTER QUALITY/////////////
+	/*
+	 * return codes: 0 if x, y in same corner, reported in same component (TP). 1 if
+	 * x, y in same corner, reported in different components (FN). 2 if x, y in
+	 * different corners, reported in same component (FP). 3 if x, y in different
+	 * corners, reported in different components (TN).
+	 */
+	ToIntBiFunction<PointInSimplex, PointInSimplex> clusterValidator = (x, y) -> {
+		boolean sameBooster = (Integer.compare(x.getCorner(), y.getCorner()) == 0); // fields of x, y
+		// Find connected component of the cluster graph which contains x.
+		Set<PointInSimplex> componentX = this.cohere.getStronglyConnectedComponents().nodes().stream()
+				.filter(component -> component.contains(x)).findFirst().orElse(new HashSet<>());
+		boolean sameComponent = componentX.contains(y);
+		int cornerBit = sameBooster ? 0 : 2;
+		int reportBit = sameComponent ? 0 : 1;
+		return cornerBit + reportBit;
+	};
+
+	/*
+	 * Method of the class CohesionGraphTest
+	 */
+	private void reportClusterQuality() {
+		int[] tPfNfPtN = new int[4]; // components count TP, FN, FP, tN, respectively
+		int xr, yr; // random indices
+		int outcome;
+		Arrays.fill(tPfNfPtN, 0);
+		for (int i = 0; i < this.numSampledPairs; i++) {
+			xr = g.nextInt(this.n);
+			yr = g.nextInt(this.n - 1);
+			yr = (yr >= xr) ? yr + 1 : yr; // ensures pair {x, y} are distinct and uniform
+			outcome = this.clusterValidator.applyAsInt(this.points.get(xr), this.points.get(yr));
+			tPfNfPtN[outcome]++;
+		}
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println(this.numSampledPairs + " pairs of points were sampled.");
+		int numSameCorner = tPfNfPtN[0] + tPfNfPtN[1];
+		double falseNegativeRate = 100.0 * (double) tPfNfPtN[1] / (double) numSameCorner;
+		System.out.println("Out of " + numSameCorner + " in the same corner, " + falseNegativeRate
+				+ "% were falsely reported in different components.");
+		int numDiffCorner = tPfNfPtN[2] + tPfNfPtN[3];
+		double falsePositiveRate = 100.0 * (double) tPfNfPtN[2] / (double) numDiffCorner;
+		System.out.println("Out of " + numDiffCorner + " in the different corners, " + falsePositiveRate
+				+ "% were falsely reported in SAME component.");	
+	}
 }

@@ -41,7 +41,7 @@ public class KNNDescentOnSimplexTest {
 		for (int i = 0; i < this.d; i++) {
 			vec[i] = vec[i] / sum;
 		} // normalize so sum is 1
-		return new PointInSimplex(this.d, vec);
+		return new PointInSimplex(this.d, vec, Integer.MIN_VALUE);
 	};
 
 	/*

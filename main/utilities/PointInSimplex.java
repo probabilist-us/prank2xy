@@ -6,8 +6,8 @@
  * Since many computations may occur, the logs of the probabilities
  * p_1, ...p_d are precomputed and saved.
  * Also the associated comparator.
- * @since 06-Apr-2020
- * TODO insert field for a cluster number (from 0 to d-1), copied from boost
+ * @since June 1, -2020
+ * 
  */
 package utilities;
 
@@ -23,15 +23,17 @@ public class PointInSimplex {
 
 	final int d; // dimension
 	final double[] p; // all > 0
+	final int corner; // which of corners 0, 1, 2, ..., d-1 is this close to? Use Integer.MIN_VALUE if no corner
 	double[] logp;
 	Comparator<PointInSimplex> cprtr;
 
 	/**
 	 * 
 	 */
-	public PointInSimplex(int dimension, double[] probabilities) {
+	public PointInSimplex(int dimension, double[] probabilities, int myCorner) {
 		this.d = dimension;
 		this.p = probabilities;
+		this.corner = myCorner;
 		this.logp = Arrays.stream(this.p).map(z -> Math.log(z)).toArray();
 		/*
 		 * Refer to this object as x. rank_x(y) < rank_x(z) means D(x | y) - D(x | z) <
@@ -86,6 +88,13 @@ public class PointInSimplex {
 	 */
 	public double[] getP() {
 		return p;
+	}
+
+	/**
+	 * @return the corner
+	 */
+	public int getCorner() {
+		return corner;
 	}
 
 }
