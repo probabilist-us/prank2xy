@@ -11,6 +11,10 @@
  */
 package algorithmTests;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -26,6 +30,9 @@ import java.util.function.Supplier;
 import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 
 import com.google.common.graph.EndpointPair;
 import com.google.common.graph.ImmutableGraph;
@@ -45,7 +52,7 @@ public class CohesionGraphTest {
 	List<PointInSimplex> points;
 	KNNDescent<PointInSimplex> knnd;
 	CohesionGraphBuilder<PointInSimplex> cohere;
-	final int dirichletP = 3; // will add dirichletP exponential r.v.s at a time
+	final int dirichletP = 2; // will add dirichletP exponential r.v.s at a time
 	/*
 	 * Generate samples from d-dimensional Dirichlet(k_1, k_2, ...k_d)
 	 * distributions. Here k_i = 3, except for one randomly chosen coordinate, where
@@ -111,13 +118,20 @@ public class CohesionGraphTest {
 		int d = Integer.parseInt(args[0]);
 		int n = Integer.parseInt(args[1]);
 		int k = Integer.parseInt(args[2]);
-		boolean microDiagnostics = false; // only do this for examples with < 100 vertices
+		/*
+		 * For manual checking of correctness for examples with < 100 vertices
+		 */
+		boolean microDiagnostics = false; 
 		/*
 		 * Sample many pairs {x, y} of points. When x and y are in same true cluster,
 		 * are they in same reported cluster?
 		 */
 		boolean clusterQualityReport = true;
-		boolean writePointsToCSV = true; // for external use of alternative clustering, such as DBSCAN
+		/*
+		 * Compare local depth with alternative clustering, such as DBSCAN.
+		 * For this, print points to CSV file.
+		 */
+		boolean writePointsToCSVFile = true; // 
 		// Random g = new Random();
 		CohesionGraphTest test = new CohesionGraphTest(d, n, k);
 		Runtime rt = Runtime.getRuntime();
@@ -191,6 +205,10 @@ public class CohesionGraphTest {
 		}
 		if (clusterQualityReport) {
 			test.reportClusterQuality();
+		}
+		if (writePointsToCSVFile) {
+			String fileName = "d" + d + "-n" + n + "-k" + k + "-" + System.currentTimeMillis();
+			test.writePointsToCSV(fileName);
 		}
 	}
 
@@ -327,6 +345,29 @@ public class CohesionGraphTest {
 		int numDiffCorner = tPfNfPtN[2] + tPfNfPtN[3];
 		double falsePositiveRate = 100.0 * (double) tPfNfPtN[2] / (double) numDiffCorner;
 		System.out.println("Out of " + numDiffCorner + " in the different corners, " + falsePositiveRate
-				+ "% were falsely reported in SAME component.");	
+				+ "% were falsely reported in SAME component.");
+	}
+
+	private void writePointsToCSV(String fileName) {
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileName + ".csv"));
+				CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT);) {
+			int n2p = n * n + 1; // base for modular arithmetic, to improve readability
+			int lines = 0;
+			for (PointInSimplex x : this.points) {
+				csvPrinter.print(Integer.toString(x.hashCode() % n2p)); // point ID
+				csvPrinter.print(Integer.toString(x.getCorner())); // corner it belongs to
+				for (double z : x.getP()) {
+					csvPrinter.print(Double.toString(z)); // components of the vector
+				}
+				csvPrinter.println();
+				lines++;
+			}
+			System.out.println("CSV file created with " + lines + " lines, called " + fileName + ".csv");
+			csvPrinter.flush();
+			writer.flush();
+			writer.close();
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
 	}
 }
