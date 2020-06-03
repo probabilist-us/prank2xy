@@ -134,6 +134,7 @@ public class CohesionGraphTest {
 		boolean writePointsToCSVFile = true; // 
 		// Random g = new Random();
 		CohesionGraphTest test = new CohesionGraphTest(d, n, k);
+
 		Runtime rt = Runtime.getRuntime();
 		System.out.println(
 				"Java Runtime " + Runtime.version().toString() + "; Available processors: " + rt.availableProcessors());
@@ -144,10 +145,16 @@ public class CohesionGraphTest {
 		int maxRounds = 2 * test.knnd.getExpanderBasedRoundCount();
 		double sampleRate = 0.5;
 		System.out.println("n = " + test.n + " points; " + test.k + " nearest friends.");
+		long start = System.currentTimeMillis();
 		test.knnd.kNNDescentAlgorithm(maxRounds, sampleRate);
+		long duration = System.currentTimeMillis() - start;
+		System.out.println("Total time for KNN descent: " + (0.001*(double)duration) + " seconds.");
 		System.out.println("Preparing focus graph and cohesion matrix.");
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		start = System.currentTimeMillis();
 		test.cohere = new CohesionGraphBuilder<PointInSimplex>(test.knnd.getFriends());
+		duration = System.currentTimeMillis() - start;
+		System.out.println("Total time for cohesion and cluster graph: " + (0.001*(double)duration) + " seconds.");
 		///////////////////////////////// INSPECT GRAPHS
 		///////////////////////////////// /////////////////////////////////////////
 		ImmutableValueGraph<PointInSimplex, Integer> focusGraph = ImmutableValueGraph
