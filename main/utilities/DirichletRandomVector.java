@@ -20,6 +20,7 @@ public class DirichletRandomVector {
 		GammaDistribution dist = new GammaDistribution(shape, 1.0);
 		return dist.sample();
 	};
+	final double eps = 1.0E-6; // do not return values less than this threshold
 
 	public DirichletRandomVector() {
 		g = new SplittableRandom();
@@ -41,20 +42,21 @@ public class DirichletRandomVector {
 	 * 
 	 * @param alpha vector of d positive parameters
 	 * @return Dirichlet Random Vector with parameters alpha[0],,, alpha[d-1]
-	 *         Deoends on Commons Math3
+	 *         Deoends on Commons Math3 Avoids returning any componet of size < eps
 	 */
 	public double[] simulate(double[] alpha) {
 		double[] x = Arrays.stream(alpha).map(a -> gamma.applyAsDouble(a)).toArray();
 		double sum = Arrays.stream(x).sum();
-		return Arrays.stream(x).map(z -> z / sum).toArray();
+		double eps1 = 1.0 - eps * (double) alpha.length;
+		return Arrays.stream(x).map(z -> this.eps + eps1 * z / sum).toArray();
 	}
 
 	/**
 	 * 
 	 * @param d dimension = # components (whose sum will be 1.0)
 	 * @param n sample size (number of vectors with same Dirichlet parameters)
-	 * @return n Dirichlet Random Vector with SAME parameter set, which is selected randomly. Each
-	 *         such parameter has a mean of 1.0.
+	 * @return n Dirichlet Random Vector with SAME parameter set, which is selected
+	 *         randomly. Each such parameter has a mean of 1.0.
 	 * 
 	 */
 	public double[][] simulateWithRandomParams(int d, int n) {
@@ -62,7 +64,8 @@ public class DirichletRandomVector {
 		double lambda = -(double) d * Math.log(this.g.nextDouble()); // Exponential R.V, mean d
 		double[] alpha = Arrays.stream(dirichlet1).map(z -> z * lambda).toArray(); // random parameters, random scale
 		double[][] matrix = new double[n][d];
-		IntStream.range(0, n).parallel().forEach(i -> matrix[i] = this.simulate(alpha)); // each row is a new sample, SAME alpha
+		IntStream.range(0, n).parallel().forEach(i -> matrix[i] = this.simulate(alpha)); // each row is a new sample,
+																							// SAME alpha
 		return matrix;
 	}
 

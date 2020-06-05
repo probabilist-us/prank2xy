@@ -44,6 +44,12 @@ public class DirichletRandomVectorTest {
 			}
 			System.out.println();
 		}
+		n = 1000000;
+		System.out.println("Timing test: n = " + n);
+		long start = System.currentTimeMillis();
+		double[][] r2 = test.drv.simulateWithRandomParams(d, n);
+		long duration = System.currentTimeMillis() - start;
+		System.out.println((double)duration/1000.0 + " seconds");
 	}
 
 }

@@ -6,6 +6,10 @@
  * Since many computations may occur, the logs of the probabilities
  * p_1, ...p_d are precomputed and saved.
  * Also the associated comparator.
+ * 
+ * For testing clustering algorithms, we record the index of the template
+ * used to build the point; typically this means a vector of d parameters for
+ * a Dirichlet distribution.
  * @since June 1, -2020
  * 
  */
@@ -23,23 +27,23 @@ public class PointInSimplex {
 
 	final int d; // dimension
 	final double[] p; // all > 0
-	final int corner; // which of corners 0, 1, 2, ..., d-1 is this close to? Use Integer.MIN_VALUE if no corner
+	final int template; // which template was used to generate p? Use Integer.MIN_VALUE if irrelevant.
 	double[] logp;
 	Comparator<PointInSimplex> cprtr;
 
 	/**
 	 * 
 	 */
-	public PointInSimplex(int dimension, double[] probabilities, int myCorner) {
+	public PointInSimplex(int dimension, double[] probabilities, int myTemplate) {
 		this.d = dimension;
 		this.p = probabilities;
-		this.corner = myCorner;
+		this.template = myTemplate;
 		this.logp = Arrays.stream(this.p).map(z -> Math.log(z)).toArray();
 		/*
-		 * Refer to this object as x. rank_x(y) < rank_x(z) means D(x | y) - D(x | z) <
-		 * 0.
+		 * Refer to this object as x. rank_x(y) < rank_x(z) means D(x | y) < D(x | z).
+		 * Revised June 4, 2020.
 		 */
-		this.cprtr = (y, z) -> (int) Math.signum(div.applyAsDouble(this, y) - div.applyAsDouble(this, z));
+		this.cprtr = (y, z) -> Double.compare(div.applyAsDouble(this, y), div.applyAsDouble(this, z));
 	}
 
 	/*
@@ -91,10 +95,10 @@ public class PointInSimplex {
 	}
 
 	/**
-	 * @return the corner
+	 * @return the template
 	 */
-	public int getCorner() {
-		return corner;
+	public int getTemplate() {
+		return template;
 	}
 
 }
