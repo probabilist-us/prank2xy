@@ -2,7 +2,7 @@
  * @author rwdarli
  * 
  * Motivation: simulate random probability distributions.
- * 
+ * Revised June 8, 2020
  */
 package utilities;
 
@@ -31,12 +31,23 @@ public class DirichletRandomVector {
 	 * @param d dimension = # components (whose sum will be 1.0)
 	 * @return d Exponential(1) random variables, divided by their sum, i.e.
 	 *         Dirichlet Random Vector where all parameters are 1.0.
+	 *         NOT USED in simulateWithRandomParams() method.
 	 */
 	public double[] simulate(int d) {
 		double[] x = this.g.doubles(d).map(z -> -Math.log(z)).toArray();
 		double sum = Arrays.stream(x).sum();
 		return Arrays.stream(x).map(z -> z / sum).toArray();
 	}
+	
+	/**
+	 * 
+	 * @param d dimension = # components (sum <= d/eps, large variance)
+	 * @return a vector whose components are i.i.d. 1/U, U ~ Uniform(eps, 1)
+	 * PURPOSE: generate one Dirichlet parameter vector for a whole set of points
+	 */
+	public double[] simulateInverseUniform(int d) {
+		return this.g.doubles(d, eps, 1.0).map(z->1.0/z).toArray(); // upper bounded by 1.0/eos
+	}	
 
 	/**
 	 * 
@@ -56,16 +67,13 @@ public class DirichletRandomVector {
 	 * @param d dimension = # components (whose sum will be 1.0)
 	 * @param n sample size (number of vectors with same Dirichlet parameters)
 	 * @return n Dirichlet Random Vector with SAME parameter set, which is selected
-	 *         randomly. Each such parameter has a mean of 1.0.
+	 *         randomly. 
 	 * 
 	 */
-	public double[][] simulateWithRandomParams(int d, int n) {
-		double[] dirichlet1 = this.simulate(d); // parameters sum to 1, random ratios
-		double lambda = -(double) d * Math.log(this.g.nextDouble()); // Exponential R.V, mean d
-		double[] alpha = Arrays.stream(dirichlet1).map(z -> z * lambda).toArray(); // random parameters, random scale
+	public double[][] simulateWithRandomParams(int d, int n) {		
+		double[] alpha =  this.simulateInverseUniform(d);  // random parameters, random scale
 		double[][] matrix = new double[n][d];
-		IntStream.range(0, n).parallel().forEach(i -> matrix[i] = this.simulate(alpha)); // each row is a new sample,
-																							// SAME alpha
+		IntStream.range(0, n).parallel().forEach(i -> matrix[i] = this.simulate(alpha)); // each row is a new sample,																							// SAME alpha
 		return matrix;
 	}
 

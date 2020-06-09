@@ -4,6 +4,10 @@
  * Revised 4.9.20 so friend sets are always sorted.
  * Termination criterion uses friend clustering rate.
  * 
+ * WARNING: In a Sorted Set, comparator determines the .equals() method.
+ * Hence if two items are tied, one will be DROPPED from the set!
+ * A data set in which ties may exist should be "pre-jittered" to resolve all ties.
+ * 
  * References:
  * [1]Jacob D. Baron; R. W. R. Darling. K-nearest neighbor approximation via the friend-of-a-friend principle. arXiv:1908.07645,
  * [2] Dong, Wei; Moses, Charikar; Li, Kai. Efficient k-nearest neighbor graph construction for generic similarity measures. 

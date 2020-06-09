@@ -21,12 +21,21 @@ public class DirichletRandomVectorTest {
 	 */
 	public static void main(String[] args) {
 		DirichletRandomVectorTest test = new DirichletRandomVectorTest();
-		int d = 10;
+		int d = 8;
 		System.out.println("Simulate " + d + "-dimensional standard Dirichlet vector.");
 		double[] x = test.drv.simulate(d);
 		for (double z : x) {
 			System.out.print(z + ", ");
 		}
+		System.out.println();
+		System.out.println("_/ _/ _/ ");
+		System.out.println("Simulate " + d + " reciprocals of Uniform r.v..");
+		double[] x1 = test.drv.simulateInverseUniform(d);
+		for (double z : x1) {
+			System.out.print(z + ", ");
+		}
+		System.out.println();
+		System.out.println("_/ _/ _/ ");
 		System.out.println();
 		double[] alpha = new double[] { 1.0, 2.0, 3.0, 4.0 };
 		System.out.println("Simulate 4- dimensional Dirichlet vector, params 1, 2, 3, 4.");
@@ -34,6 +43,8 @@ public class DirichletRandomVectorTest {
 		for (double z : y) {
 			System.out.print(z + ", ");
 		}
+		System.out.println();
+		System.out.println("_/ _/ _/ ");
 		System.out.println();
 		int n = 4;
 		System.out.println(n + " times, simulate " + d + "-dimensional Dirichlet vector, same randomized params.");

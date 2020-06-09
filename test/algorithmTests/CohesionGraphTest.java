@@ -1,12 +1,12 @@
 /**
  * Design:
- * (0) Small number of groups is best, e.g. 3
- * (1) Generate samples from biased Dirichlet distributions (revised June 4, 2020)
+ * (0) Choose d, n, nc, k
+ * (1) Generate samples from biased Dirichlet distributions (revised June 8, 2020)
  * (2) Apply kNNdescent
  * (3) Build focusGraph (done 4.12.2020)
  * (4) Build cohesionGraph  - done
  * (5) Build clusterGraph -done
- * (6) Compare clustering accuracy with DBSCAN, especially when cluster dispersion varies. TODO
+ * (6) Compare clustering accuracy with DBSCAN, especially when cluster dispersion varies. 
  */
 package algorithmTests;
 
@@ -59,15 +59,16 @@ public class CohesionGraphTest {
 	public CohesionGraphTest(int dimension, int numGroups, int numPoints, int numNeighbors) {
 		this.d = dimension;
 		this.nc = numGroups;
-		this.k = numNeighbors;		
+		this.k = numNeighbors;
 		g = new Random();
 		this.drv = new DirichletRandomVector();
 		/*
 		 * Generate the sizes of the clusters, and the set of points in each cluster.
 		 * Sizes proportional to inter-arrival times in a rate 1 Poisson process.
 		 */
-		int[] clusterSizes = Arrays.stream(this.drv.simulate(nc)).mapToInt(z -> (int) Math.round(z * (double) numPoints))
-				.toArray(); /// rounding means these may not sum exactly to n
+		int[] clusterSizes = Arrays.stream(this.drv.simulate(nc))
+				.mapToInt(z -> (int) Math.round(z * (double) numPoints)).toArray(); /// rounding means these may not sum
+																					/// exactly to n
 		this.points = new ArrayList<PointInSimplex>();
 		/*
 		 * Generate samples from d-dimensional Dirichlet(k_1, k_2, ...k_d)
@@ -81,8 +82,9 @@ public class CohesionGraphTest {
 			}
 		}
 		this.n = this.points.size(); // may differ by a few from numPoints
-		this.numSampledPairs = Math.min(10000, (this.n * (this.n - 1)) / 2); // for testing cluster quality
-		System.out.println("# Dirichlet samples generated = " + this.points.size());
+		this.numSampledPairs = Math.min(20000, (this.n * (this.n - 1)) / 2); // for testing cluster quality
+		System.out
+				.println("# Dirichlet samples generated = " + this.points.size() + ": Reciprocal Uniform Parameters.");
 		System.out.println("True sizes of the clusters:");
 		for (int c = 0; c < nc; c++) {
 			System.out.print(clusterSizes[c] + ", ");
@@ -202,7 +204,7 @@ public class CohesionGraphTest {
 			test.reportClusterQuality();
 		}
 		if (writePointsToCSVFile) {
-			String fileName = "d" + d + "-n" + n + "-k" + k + "-" + System.currentTimeMillis();
+			String fileName = "RecipUnif-d" + d + "-n" + n + "-nc" + nc + "-k" + k + "-" + System.currentTimeMillis();
 			test.writePointsToCSV(fileName);
 		}
 	}
@@ -332,6 +334,9 @@ public class CohesionGraphTest {
 			tPfNfPtN[outcome]++;
 		}
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println("Confusion Matrix: ");
+		System.out.println("[" + tPfNfPtN[0] + " " + tPfNfPtN[2] + "]");
+		System.out.println("[" + tPfNfPtN[1] + " " + tPfNfPtN[3] + "]");
 		System.out.println(this.numSampledPairs + " pairs of points were sampled.");
 		int numSameTemplate = tPfNfPtN[0] + tPfNfPtN[1];
 		double falseNegativeRate = 100.0 * (double) tPfNfPtN[1] / (double) numSameTemplate;
