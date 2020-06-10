@@ -111,7 +111,7 @@ public class CohesionGraphTest {
 		/*
 		 * For manual checking of correctness for examples with < 100 vertices
 		 */
-		boolean microDiagnostics = false;
+		boolean microDiagnostics = true;
 		/*
 		 * Sample many pairs {x, y} of points. When x and y are in same true cluster,
 		 * are they in same reported cluster?
@@ -215,7 +215,7 @@ public class CohesionGraphTest {
 	 * Method of the class CohesionGraphTest
 	 */
 	private void reportMicroDiagnostics() {
-		int n2p = n * n + 1; // base for modular arithmetic, to improve readability
+		int n2p = 10 * n * n + 1; // base for modular arithmetic, to improve readability
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		System.out.println("List of points and their coordinates: ");
 		for (PointInSimplex x : this.points) {

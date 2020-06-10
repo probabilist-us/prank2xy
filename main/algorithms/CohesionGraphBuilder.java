@@ -140,7 +140,7 @@ public class CohesionGraphBuilder<V> {
 		/*
 		 * Cohesion Vector Scores assigns to x the map v -> (n-1)*C_{x, v}, with v
 		 * sorted by rank, INCLUDING case v = x. Using descending iterator on friends of
-		 * x gives factor K speed up.
+		 * x gives factor K speed up. Only defined when v is a friend of x, or v = x.
 		 */
 		Function<V, Map<V, Double>> cohesionScoreMap = x -> {
 			Map<V, Double> cohesionMap = new HashMap<>();
@@ -194,6 +194,7 @@ public class CohesionGraphBuilder<V> {
 		 * Build DIRECTED unweighted cluster graph, no loops. Select the edges of the
 		 * cohesionGraph of above average weight. NEW 5.27.20: delete x->y unless BOTH
 		 * x->y AND y->x have weights > tau
+		 * WARNING: When x->y is an edge in the cohesion graph, y->x need not be.
 		 */
 		this.start = System.currentTimeMillis();
 		this.clusterGraph = GraphBuilder.directed().allowsSelfLoops(false)
