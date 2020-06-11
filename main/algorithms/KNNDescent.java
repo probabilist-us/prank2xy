@@ -191,6 +191,7 @@ public class KNNDescent<V> {
 				.collect(Collectors.toMap(Function.identity(), x -> proposeNewFriendSet.apply(x))); // choice between
 																									// parallel or not
 		this.friends.putAll(friendUpdates); // replaces previous friend sets with new ones
+		
 	}
 
 	/*

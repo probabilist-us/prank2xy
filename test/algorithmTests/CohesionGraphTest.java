@@ -7,6 +7,7 @@
  * (4) Build cohesionGraph  - done
  * (5) Build clusterGraph -done
  * (6) Compare clustering accuracy with DBSCAN, especially when cluster dispersion varies. 
+ * (7) Export files usable for force-directed graph drawing (done 6.10.2020)
  */
 package algorithmTests;
 
@@ -33,6 +34,8 @@ import org.apache.commons.csv.CSVPrinter;
 import com.google.common.graph.EndpointPair;
 import com.google.common.graph.ImmutableGraph;
 import com.google.common.graph.ImmutableValueGraph;
+import com.google.common.graph.MutableValueGraph;
+import com.google.common.graph.ValueGraphBuilder;
 
 import algorithms.CohesionGraphBuilder;
 import algorithms.KNNDescent;
@@ -109,9 +112,9 @@ public class CohesionGraphTest {
 		int n = Integer.parseInt(args[2]);
 		int k = Integer.parseInt(args[3]);
 		/*
-		 * For manual checking of correctness for examples with < 100 vertices
+		 * For manual checking of correctness for examples with < 100 vertices.
 		 */
-		boolean microDiagnostics = true;
+		boolean microDiagnostics = false;
 		/*
 		 * Sample many pairs {x, y} of points. When x and y are in same true cluster,
 		 * are they in same reported cluster?
@@ -121,36 +124,49 @@ public class CohesionGraphTest {
 		 * Compare local depth with alternative clustering, such as DBSCAN. For this,
 		 * print points to CSV file.
 		 */
-		boolean writePointsToCSVFile = false; //
+		boolean writePointsToCSVFile = true; //
+		/*
+		 * Exporting file for force-directed drawing
+		 */
+		boolean exportGraphDrawingData = true;
 		// Random g = new Random();
-		CohesionGraphTest test = new CohesionGraphTest(d, nc, n, k);
 
+		/////////////////////////////// MACHINE DATA
+		/////////////////////////////// /////////////////////////////////////////
 		Runtime rt = Runtime.getRuntime();
 		System.out.println(
 				"Java Runtime " + Runtime.version().toString() + "; Available processors: " + rt.availableProcessors());
 		double gB = 1074741824.0;
 		System.out.println("Maximum available memory: " + (double) rt.maxMemory() / gB + " Gb.");
+
+		////////////////////////////// nearest neighbor approximation
+		////////////////////////////// /////////////////////////////
+		CohesionGraphTest test = new CohesionGraphTest(d, nc, n, k);
+		int maxRounds = 2 * test.knnd.getExpanderBasedRoundCount();
+		double sampleRate = 0.5; // reduce for large n
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		System.out.println("KNN Descent applied to Dirichlet samples of dimension " + test.d);
-		int maxRounds = 2 * test.knnd.getExpanderBasedRoundCount();
-		double sampleRate = 0.5;
-		System.out.println("n = " + test.n + " points; " + test.k + " nearest friends.");
+		System.out.println("n = " + test.n + " points; " + test.k + " nearest friends; sample rate " + sampleRate);
 		long start = System.currentTimeMillis();
 		test.knnd.kNNDescentAlgorithm(maxRounds, sampleRate);
 		long duration = System.currentTimeMillis() - start;
 		System.out.println("Total time for KNN descent: " + (0.001 * (double) duration) + " seconds.");
+		System.out.println();
+		///////////////////// COHESION
+		///////////////////// //////////////////////////////////////////////////////////////////
 		System.out.println("Preparing focus graph and cohesion matrix.");
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		start = System.currentTimeMillis();
 		test.cohere = new CohesionGraphBuilder<PointInSimplex>(test.knnd.getFriends());
 		duration = System.currentTimeMillis() - start;
 		System.out.println("Total time for cohesion and cluster graph: " + (0.001 * (double) duration) + " seconds.");
+		System.out.println();
 		///////////////////////////////// INSPECT GRAPHS
 		///////////////////////////////// /////////////////////////////////////////
 		ImmutableValueGraph<PointInSimplex, Integer> focusGraph = ImmutableValueGraph
 				.copyOf(test.cohere.getFocusGraph());
 		ImmutableGraph<PointInSimplex> mutualFriendGraph = ImmutableGraph.copyOf(test.cohere.getMutualFriendGraph());
-		System.out.println();
+
 		System.out.println();
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
 		System.out.println("Focus graph has " + focusGraph.nodes().size() + " vertices, and "
@@ -170,6 +186,7 @@ public class CohesionGraphTest {
 		System.out.println("Empirical mean cohesion value: " + test.cohere.getEmpiricalMeanCohesion());
 		System.out.println("Theoretical mean cohesion value: " + test.cohere.getTheoreticalMeanCohesion());
 		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+
 		///////////////////////////////// MICRO-DIAGNOSTICS - OPTIONAL
 		///////////////////////////////// /////////////////////////////////////////
 		if (microDiagnostics) {
@@ -203,102 +220,20 @@ public class CohesionGraphTest {
 		if (clusterQualityReport) {
 			test.reportClusterQuality();
 		}
+		long timeStamp = System.currentTimeMillis();
 		if (writePointsToCSVFile) {
-			String fileName = "RecipUnif-d" + d + "-n" + n + "-nc" + nc + "-k" + k + "-" + System.currentTimeMillis();
-			test.writePointsToCSV(fileName);
+			String fileName1 = "RecipUnif-d" + d + "-n" + n + "-nc" + nc + "-k" + k + "-" + timeStamp;
+			test.writePointsToCSV(fileName1);
+		}
+
+		if (exportGraphDrawingData) {
+			String fileName2 = "WeightedClusterGraph-" + n + "-vertices-" + clusterGraph.edges().size() + "-edges-"
+					+ timeStamp;
+			test.writeClusterGraphToCSV(fileName2);
 		}
 	}
 
 	///////////////////////////////// FOCUS GRAPH
-	///////////////////////////////// MICRO-DIAGNOSTICS////////////////////////////
-	/*
-	 * Method of the class CohesionGraphTest
-	 */
-	private void reportMicroDiagnostics() {
-		int n2p = 10 * n * n + 1; // base for modular arithmetic, to improve readability
-		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
-		System.out.println("List of points and their coordinates: ");
-		for (PointInSimplex x : this.points) {
-			System.out.print("{" + (x.hashCode() % n2p) + " ");
-			for (double u : x.getP()) {
-				System.out.print(", " + u);
-			}
-			System.out.print("},");
-			System.out.println();
-		}
-		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
-		System.out.println("List of all the friend sets: ");
-		System.out.println();
-		boolean listIncidenteEges = true;
-		for (Map.Entry<PointInSimplex, NavigableSet<PointInSimplex>> e : this.knnd.getFriends().entrySet()) {
-			System.out.print("Base Point: " + (e.getKey().hashCode() % n2p) + " (mod " + n2p + ") has friends ");
-			for (PointInSimplex x : e.getValue()) {
-				System.out.print((x.hashCode() % n2p) + ", ");
-			}
-			System.out.println();
-			/*
-			 * For the first point in the list, study weights of all incident edges
-			 */
-			int u0, u1, w;
-			if (listIncidenteEges) {
-				System.out.println("Edges incident to first vertex, and size of conflict focus V_{x, y} ");
-				u0 = e.getKey().hashCode() % n2p;
-				for (PointInSimplex x : this.cohere.getFocusGraph().adjacentNodes(e.getKey())) {
-					u1 = x.hashCode() % n2p;
-					w = this.cohere.getFocusGraph().edgeValueOrDefault(e.getKey(), x, Integer.MIN_VALUE);
-					System.out.println("Edge {" + u0 + ", " + u1 + "}: " + w);
-				}
-				System.out.println();
-			}
-			listIncidenteEges = false; // only do the list once
-		}
-		System.out.println();
-		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
-		System.out.println("Cohesion graph: edge weights, omitting loops");
-		int counter = 0;
-		int u, v;
-		double w;
-		for (EndpointPair<PointInSimplex> pair : this.cohere.getCohesionGraph().edges()) {
-			u = pair.source().hashCode() % n2p;
-			v = pair.target().hashCode() % n2p;
-			w = this.cohere.getCohesionGraph().edgeValueOrDefault(pair, 0.0);
-			// Omit self-loops
-			if (u != v) {
-				System.out.print("{" + u + ", " + v + ", " + w + "}, ");
-			}
-			counter++;
-			if (counter % 5 == 0) {
-				System.out.println();
-			}
-		}
-		System.out.println();
-
-		System.out.println();
-		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
-		System.out.println("Cluster graph: edge list");
-		counter = 0;
-		for (EndpointPair<PointInSimplex> pair : this.cohere.getClusterGraph().edges()) {
-			u = pair.source().hashCode() % n2p;
-			v = pair.target().hashCode() % n2p;
-			System.out.print("{" + u + ", " + v + "}, ");
-			counter++;
-			if (counter % 10 == 0) {
-				System.out.println();
-			}
-		}
-		System.out.println();
-		System.out.println();
-		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
-		System.out.println("Cluster graph: strong components");
-		for (Set<PointInSimplex> component : this.cohere.getStronglyConnectedComponents().nodes()) {
-			System.out.print("Component: {");
-			for (PointInSimplex vertex : component) {
-				System.out.print((vertex.hashCode() % n2p) + ", ");
-			}
-			System.out.println("}");
-		}
-
-	}
 
 	/////////////////////////// DIAGNOSE CLUSTER QUALITY/////////////
 	/*
@@ -348,6 +283,9 @@ public class CohesionGraphTest {
 				+ "% were falsely reported in SAME component.");
 	}
 
+	/*
+	 * Method of the class CohesionGraphTest
+	 */
 	private void writePointsToCSV(String fileName) {
 		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileName + ".csv"));
 				CSVPrinter csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT);) {
@@ -369,5 +307,127 @@ public class CohesionGraphTest {
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}
+	}
+
+	/*
+	 * Method of the class CohesionGraphTest this.cohere.getClusterGraph() is not
+	 * sufficient because it lacks edge weights, and is directed
+	 */
+	private void writeClusterGraphToCSV(String fileName) {
+		try (var writer = Files.newBufferedWriter(Paths.get(fileName + ".csv"));
+				var csvPrinter = new CSVPrinter(writer, CSVFormat.DEFAULT);) {
+			int lines = 0;
+			int u, v;
+			double wst, wts, w;
+			/*
+			 * Make an UNDIRSCTED VERSION of cluster graph, to avoid reporting each edge
+			 * twice
+			 */
+			MutableValueGraph<PointInSimplex, Double> clusterGraphUndirect = ValueGraphBuilder.undirected()
+					.allowsSelfLoops(false).expectedNodeCount(this.cohere.getClusterGraph().nodes().size()).build();
+			for (EndpointPair<PointInSimplex> pair : this.cohere.getClusterGraph().edges()) {
+				u = pair.source().hashCode();
+				v = pair.target().hashCode();
+				wst = this.cohere.getCohesionGraph().edgeValueOrDefault(pair.source(), pair.target(), 0.0);
+				wts = this.cohere.getCohesionGraph().edgeValueOrDefault(pair.target(), pair.source(), 0.0); // reverse
+																											// direction
+				w = Math.min(wst, wts);
+				// Only print this edge to file if we are seeing it for the first time
+				if (!clusterGraphUndirect.hasEdgeConnecting(pair)) {
+					csvPrinter.print(Integer.toString(u)); // vertex u
+					csvPrinter.print(Integer.toString(v)); // vertex v
+					csvPrinter.print(Double.toString(w)); // Min(C_{u,v}, C{v, u})
+					csvPrinter.println();
+					lines++;
+					clusterGraphUndirect.putEdgeValue(pair.source(), pair.target(), w);
+				}			
+			}
+			System.out.println("CSV file created with " + lines + " undirected weighted edges, called " + fileName + ".csv");
+			csvPrinter.flush();
+			writer.flush();
+			writer.close();
+		} catch (IOException ex) {
+			ex.printStackTrace();
+		}
+
+	}
+
+	///////////////////////////////// MICRO-DIAGNOSTICS////////////////////////////
+	/*
+	 * Method of the class CohesionGraphTest
+	 */
+	private void reportMicroDiagnostics() {
+		int n2p = 10 * n * n + 1; // base for modular arithmetic, to improve readability
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println("List of all the friend sets: ");
+		System.out.println();
+		boolean listIncidenteEges = true;
+		for (Map.Entry<PointInSimplex, NavigableSet<PointInSimplex>> e : this.knnd.getFriends().entrySet()) {
+			System.out.print("Base Point: " + (e.getKey().hashCode() % n2p) + " (mod " + n2p + ") has friends ");
+			for (PointInSimplex x : e.getValue()) {
+				System.out.print((x.hashCode() % n2p) + ", ");
+			}
+			System.out.println();
+			/*
+			 * For the first point in the list, study weights of all incident edges
+			 */
+			int u0, u1, w;
+			if (listIncidenteEges) {
+				System.out.println("Edges incident to first vertex, and size of conflict focus V_{x, y} ");
+				u0 = e.getKey().hashCode() % n2p;
+				for (PointInSimplex x : this.cohere.getFocusGraph().adjacentNodes(e.getKey())) {
+					u1 = x.hashCode() % n2p;
+					w = this.cohere.getFocusGraph().edgeValueOrDefault(e.getKey(), x, Integer.MIN_VALUE);
+					System.out.println("Edge {" + u0 + ", " + u1 + "}: " + w);
+				}
+				System.out.println();
+			}
+			listIncidenteEges = false; // only do the list once
+		}
+		System.out.println();
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println("Cohesion graph: edge weights, omitting loops");
+		int counter = 0;
+		int u, v;
+		double w;
+		for (EndpointPair<PointInSimplex> pair : this.cohere.getCohesionGraph().edges()) {
+			u = pair.source().hashCode() % n2p;
+			v = pair.target().hashCode() % n2p;
+			w = this.cohere.getCohesionGraph().edgeValueOrDefault(pair, 0.0);
+			// Omit self-loops
+			if (u != v) {
+				System.out.print("{" + u + ", " + v + ", " + w + "}, ");
+			}
+			counter++;
+			if (counter % 5 == 0) {
+				System.out.println();
+			}
+		}
+		System.out.println();
+		System.out.println();
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println("Cluster graph: edge list");
+		counter = 0;
+		for (EndpointPair<PointInSimplex> pair : this.cohere.getClusterGraph().edges()) {
+			u = pair.source().hashCode() % n2p;
+			v = pair.target().hashCode() % n2p;
+			System.out.print("{" + u + ", " + v + "}, ");
+			counter++;
+			if (counter % 10 == 0) {
+				System.out.println();
+			}
+		}
+		System.out.println();
+		System.out.println();
+		System.out.println("_/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ _/ ");
+		System.out.println("Cluster graph: strong components");
+		for (Set<PointInSimplex> component : this.cohere.getStronglyConnectedComponents().nodes()) {
+			System.out.print("Component: {");
+			for (PointInSimplex vertex : component) {
+				System.out.print((vertex.hashCode() % n2p) + ", ");
+			}
+			System.out.println("}");
+		}
+
 	}
 }

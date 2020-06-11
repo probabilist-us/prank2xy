@@ -30,8 +30,9 @@ import utilities.GraphUtils;
 
 /**
  * @author rwrd
- * @since May 2020 - major revision after correct formulas discovered Premise:
- *        all strangers have tied rank K+1.
+ * @since May 2020 - major revision after correct formulas discovered. Premise:
+ *        all strangers have tied rank K+1. Large use of google guava.
+ * 
  */
 public class CohesionGraphBuilder<V> {
 	/*
@@ -39,7 +40,8 @@ public class CohesionGraphBuilder<V> {
 	 * sorted order. Not all sets friends.get(x) need be the same size. NavigableSet
 	 * interface allows descending iterator, useful for cohesion matrix.
 	 */
-	final Map<V, NavigableSet<V>> friends; // keyset = points.
+	final Map<V, NavigableSet<V>> friends;
+	//final ImmutableMap<V, ImmutableSortedSet<V>> friends; // keyset = points.
 	/*
 	 * undirected edge {x,y} carries integer |V_{x,y}|, when y is a friend of x
 	 */
@@ -64,11 +66,19 @@ public class CohesionGraphBuilder<V> {
 	 */
 	public CohesionGraphBuilder(Map<V, NavigableSet<V>> neighborSets) {
 		/*
-		 * The sorted set is cast as UNMODIFIABLE
+		 * Java - UNMODIFIABLE version
 		 */
 		this.friends = neighborSets.keySet().parallelStream().collect(
-				Collectors.toMap(Function.identity(), x -> Collections.unmodifiableNavigableSet(neighborSets.get(x))));
+				Collectors.toUnmodifiableMap(Function.identity(), x -> Collections.unmodifiableNavigableSet(neighborSets.get(x))));
 		this.nV = (double) this.friends.keySet().size(); // total size of S
+		/*
+		 * Guava - immutable version - New 6.10.20
+		 */
+		/*
+		 * this.friends = neighborSets.keySet().parallelStream().collect(
+		 * ImmutableMap.toImmutableMap(Function.identity(),
+		 * x->ImmutableSortedSet.copyOf(neighborSets.get(x) ) ) );
+		 */
 		/////////////////////// FOCUS GRAPH
 		/////////////////////// //////////////////////////////////////////////////
 		/*
@@ -171,8 +181,8 @@ public class CohesionGraphBuilder<V> {
 		 * loops. Begin by computing all the cohesion scores in parallel.
 		 */
 		Map<V, Map<V, Double>> cohesionMatrix = this.friends.keySet().parallelStream()
-				.collect(Collectors.toMap(Function.identity(), x->cohesionScoreMap.apply(x)));
-		// Insert these values as eedge weights in a directed graph
+				.collect(Collectors.toUnmodifiableMap(Function.identity(), x -> cohesionScoreMap.apply(x)));
+		// Insert these values as edge weights in a directed graph
 		double weightedTrace = 0.0;
 		this.start = System.currentTimeMillis();
 		this.cohesionGraph = ValueGraphBuilder.directed().expectedNodeCount(this.friends.keySet().size())
@@ -193,8 +203,8 @@ public class CohesionGraphBuilder<V> {
 		/*
 		 * Build DIRECTED unweighted cluster graph, no loops. Select the edges of the
 		 * cohesionGraph of above average weight. NEW 5.27.20: delete x->y unless BOTH
-		 * x->y AND y->x have weights > tau
-		 * WARNING: When x->y is an edge in the cohesion graph, y->x need not be.
+		 * x->y AND y->x have weights > tau WARNING: When x->y is an edge in the
+		 * cohesion graph, y->x need not be.
 		 */
 		this.start = System.currentTimeMillis();
 		this.clusterGraph = GraphBuilder.directed().allowsSelfLoops(false)
@@ -205,7 +215,7 @@ public class CohesionGraphBuilder<V> {
 			x = e.source();
 			y = e.target();
 			w = Math.min(this.cohesionGraph.edgeValueOrDefault(x, y, 0.0),
-					this.cohesionGraph.edgeValueOrDefault(y, x, 0.0)); //Minimum of C_{x, y} and C_{y, x}
+					this.cohesionGraph.edgeValueOrDefault(y, x, 0.0)); // Minimum of C_{x, y} and C_{y, x}
 			if ((!e.source().equals(e.target())) && (w > this.empiricalMeanCohesion)) {
 				this.clusterGraph.putEdge(e);
 			}
